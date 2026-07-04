@@ -13,5 +13,7 @@ actual fun ensureDownloadForeground() {
     // downloads still run in-process, so just skip the notification in that case.
     runCatching {
         ContextCompat.startForegroundService(ctx, Intent(ctx, DownloadService::class.java))
+    }.onFailure {
+        android.util.Log.e("DownloadManager", "Failed to start DownloadService", it)
     }
 }

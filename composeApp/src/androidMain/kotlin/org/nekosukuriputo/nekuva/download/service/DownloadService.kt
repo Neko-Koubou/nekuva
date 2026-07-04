@@ -126,18 +126,18 @@ class DownloadService : Service() {
                 }
 
                 val active = list.filter { !it.isFinished }
-                if (active.isEmpty()) {
-                    stopForegroundCompat()
-                    stopSelf()
-                    lastActiveIds = emptySet()
-                    covers.clear()
-                    return@collect
-                }
                 
                 val allCurrentIds = list.map { it.manga.id }.toSet()
                 val removedIds = lastActiveIds - allCurrentIds
                 removedIds.forEach { id -> NotificationManagerCompat.from(this@DownloadService).cancel(id.toInt()) }
                 lastActiveIds = active.map { it.manga.id }.toSet()
+
+                if (active.isEmpty()) {
+                    stopForegroundCompat()
+                    stopSelf()
+                    covers.clear()
+                    return@collect
+                }
 
                 val hasRunning = active.any { it.status == DownloadStatus.RUNNING }
 
@@ -330,11 +330,11 @@ class DownloadService : Service() {
     }
 
     private fun actionIntent(action: String, mangaId: String? = null): PendingIntent {
-        val intent = Intent(this, DownloadService::class.java).setAction(action)
+        val intent = Intent(this, DownloadActionReceiver::class.java).setAction(action)
         if (mangaId != null) {
             intent.putExtra(EXTRA_MANGA_ID, mangaId)
         }
-        return PendingIntent.getService(
+        return PendingIntent.getBroadcast(
             this,
             (action + mangaId).hashCode(),
             intent,
@@ -348,6 +348,14 @@ class DownloadService : Service() {
                 startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
             } else {
                 startForeground(NOTIFICATION_ID, notification)
+            }
+        }.onFailure {
+            android.util.Log.e("DownloadService", "Failed to startForeground", it)
+            // Fallback: post the notification normally if foreground service fails
+            try {
+                androidx.core.app.NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, notification)
+            } catch (e: Exception) {
+                android.util.Log.e("DownloadService", "Failed to post fallback notification", e)
             }
         }
     }
@@ -366,7 +374,7 @@ class DownloadService : Service() {
         super.onDestroy()
     }
 
-    private companion object {
+    internal companion object {
         const val CHANNEL_ID = "downloads"
         const val NOTIFICATION_ID = 0x444C // non-zero (required for a foreground notification)
         const val ACTION_PAUSE_ALL = "org.nekosukuriputo.nekuva.download.PAUSE_ALL"

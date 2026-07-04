@@ -183,10 +183,16 @@ class DownloadManager(
 
     fun pause(id: String) {
         controllers[id]?.paused?.value = true
+        scope.launch {
+            updateState(id) { it.copy(status = DownloadStatus.PAUSED, eta = -1L) }
+        }
     }
 
     fun resume(id: String) {
         controllers[id]?.paused?.value = false
+        scope.launch {
+            updateState(id) { it.copy(status = DownloadStatus.QUEUED) }
+        }
         ensureDownloadForeground() // restart the FGS if it stopped while everything was paused
     }
 
@@ -211,10 +217,18 @@ class DownloadManager(
 
     fun pauseAll() {
         controllers.values.forEach { it.paused.value = true }
+        scope.launch {
+            val toPause = _downloads.value.filter { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED }
+            toPause.forEach { updateState(it.id) { state -> state.copy(status = DownloadStatus.PAUSED, eta = -1L) } }
+        }
     }
 
     fun resumeAll() {
         controllers.values.forEach { it.paused.value = false }
+        scope.launch {
+            val toResume = _downloads.value.filter { it.status == DownloadStatus.PAUSED }
+            toResume.forEach { updateState(it.id) { state -> state.copy(status = DownloadStatus.QUEUED) } }
+        }
         ensureDownloadForeground()
     }
 

@@ -36,6 +36,7 @@ import org.nekosukuriputo.nekuva.core.prefs.AppSettings
 import org.nekosukuriputo.nekuva.di.initKoin
 
 fun main() {
+    System.setProperty("awt.app.name", "Nekuva")
     // Install Conscrypt as the top JSSE provider so Desktop uses the same modern TLS stack as Android.
     // The stock Linux JVM's default TLS can lack ciphers/ALPN that some manga CDNs require, making a
     // source fail on Linux Desktop while working on Windows + Android. Best-effort: if Conscrypt can't
@@ -91,18 +92,19 @@ fun main() {
         }
         val windowState = rememberWindowState()
         
-        LaunchedEffect(Unit) {
-            org.nekosukuriputo.nekuva.core.events.DesktopEvents.bringToFront.collect {
-                windowState.isMinimized = false
-            }
-        }
-
         Window(
             onCloseRequest = ::exitApplication,
             title = "Nekuva",
             icon = appIcon,
             state = windowState,
         ) {
+            LaunchedEffect(Unit) {
+                org.nekosukuriputo.nekuva.core.events.DesktopEvents.bringToFront.collect {
+                    windowState.isMinimized = false
+                    window.toFront()
+                    window.requestFocus()
+                }
+            }
             App()
         }
         // Standalone reader windows (Doki reader_multitask): one per open entry, closeable independently.

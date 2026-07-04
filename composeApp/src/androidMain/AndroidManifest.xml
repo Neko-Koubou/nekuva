@@ -105,6 +105,9 @@
             android:name=".download.service.DownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <receiver
+            android:name=".download.service.DownloadActionReceiver"
+            android:exported="false" />
 
         <!-- Favourites "shelf" home-screen widget (Doki widget/shelf). -->
         <receiver

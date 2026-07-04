@@ -27,27 +27,24 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    // Deep link (launcher dynamic shortcut tap -> open manga details), then consume it.
-    val deepLinkMangaId by DeepLinkBus.openMangaId.collectAsState()
-    androidx.compose.runtime.LaunchedEffect(deepLinkMangaId) {
-        deepLinkMangaId?.let { id ->
+    // Deep link (launcher dynamic shortcut tap -> open manga details)
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        DeepLinkBus.openMangaId.collect { id ->
             navController.navigate(MangaDetailsRoute(id))
             DeepLinkBus.consume()
         }
     }
-    // Deep link (launcher source shortcut tap -> open that source's list), then consume it.
-    val deepLinkSourceName by DeepLinkBus.openSourceName.collectAsState()
-    androidx.compose.runtime.LaunchedEffect(deepLinkSourceName) {
-        deepLinkSourceName?.let { name ->
+    // Deep link (launcher source shortcut tap -> open that source's list)
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        DeepLinkBus.openSourceName.collect { name ->
             navController.navigate(RemoteListRoute(name))
             DeepLinkBus.consumeSource()
         }
     }
 
     // Deep link -> open downloads screen
-    val openDownloads by DeepLinkBus.openDownloads.collectAsState()
-    androidx.compose.runtime.LaunchedEffect(openDownloads) {
-        if (openDownloads) {
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        DeepLinkBus.openDownloads.collect {
             navController.navigate(DownloadsRoute)
             DeepLinkBus.consumeDownloads()
         }
