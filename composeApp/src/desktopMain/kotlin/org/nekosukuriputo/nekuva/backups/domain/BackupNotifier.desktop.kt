@@ -19,6 +19,9 @@ private val trayIcon: TrayIcon? by lazy {
             object {}.javaClass.classLoader.getResource("nekuva_icon.png"),
         )
         val icon = TrayIcon(image, "Nekuva").apply { isImageAutoSize = true }
+        icon.addActionListener {
+            org.nekosukuriputo.nekuva.core.events.DesktopEvents.bringToFront()
+        }
         SystemTray.getSystemTray().add(icon)
         icon
     }.getOrNull()

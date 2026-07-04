@@ -44,6 +44,15 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         }
     }
 
+    // Deep link -> open downloads screen
+    val openDownloads by DeepLinkBus.openDownloads.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(openDownloads) {
+        if (openDownloads) {
+            navController.navigate(DownloadsRoute)
+            DeepLinkBus.consumeDownloads()
+        }
+    }
+
     // Top-level destinations that show the bottom bar / navigation rail
     val topLevelRoutes = listOf(
         HistoryTabRoute::class.qualifiedName,

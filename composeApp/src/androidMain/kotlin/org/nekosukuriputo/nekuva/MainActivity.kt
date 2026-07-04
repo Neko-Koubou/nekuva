@@ -74,6 +74,9 @@ class MainActivity : ComponentActivity() {
 
     // Launcher dynamic shortcut tap (Doki dynamic_shortcuts) -> open that manga / source via the deep-link bus.
     private fun handleShortcutIntent(intent: Intent?) {
+        if (intent?.action == "org.nekosukuriputo.nekuva.OPEN_DOWNLOADS") {
+            DeepLinkBus.requestOpenDownloads()
+        }
         val id = intent?.getLongExtra(EXTRA_MANGA_ID, -1L) ?: -1L
         if (id > 0L) DeepLinkBus.requestOpenManga(id)
         intent?.getStringExtra(org.nekosukuriputo.nekuva.core.shortcuts.EXTRA_SOURCE_NAME)

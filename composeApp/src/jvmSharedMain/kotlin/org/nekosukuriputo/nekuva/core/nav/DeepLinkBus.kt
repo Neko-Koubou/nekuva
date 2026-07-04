@@ -15,4 +15,8 @@ object DeepLinkBus {
     val openSourceName = MutableStateFlow<String?>(null)
     fun requestOpenSource(name: String) { openSourceName.value = name }
     fun consumeSource() { openSourceName.value = null }
+
+    val openDownloads = MutableStateFlow(false)
+    fun requestOpenDownloads() { openDownloads.value = true }
+    fun consumeDownloads() { openDownloads.value = false }
 }

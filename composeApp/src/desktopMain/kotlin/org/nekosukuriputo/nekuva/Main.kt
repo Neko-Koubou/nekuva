@@ -89,10 +89,19 @@ fun main() {
             }
             return@application
         }
+        val windowState = rememberWindowState()
+        
+        LaunchedEffect(Unit) {
+            org.nekosukuriputo.nekuva.core.events.DesktopEvents.bringToFront.collect {
+                windowState.isMinimized = false
+            }
+        }
+
         Window(
             onCloseRequest = ::exitApplication,
             title = "Nekuva",
             icon = appIcon,
+            state = windowState,
         ) {
             App()
         }

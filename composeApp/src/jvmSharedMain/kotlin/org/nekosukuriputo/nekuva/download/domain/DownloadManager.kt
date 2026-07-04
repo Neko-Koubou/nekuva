@@ -117,7 +117,9 @@ class DownloadManager(
             .getOrNull().orEmpty()
         runCatching { file.delete() } // scheduling re-persists the live set
         for (p in saved) {
-            val manga = runCatching { mangaDataRepository.findMangaById(p.mangaId, withChapters = true) }
+            val mangaId = p.mangaId
+            if (_downloads.value.any { !it.isFinished && it.manga.id == mangaId }) continue
+            val manga = runCatching { mangaDataRepository.findMangaById(mangaId, withChapters = true) }
                 .getOrNull() ?: continue
             val task = DownloadTask(
                 manga = manga,
@@ -154,11 +156,10 @@ class DownloadManager(
     /** Enqueue downloads; returns whether anything was started immediately (vs added paused). */
     suspend fun schedule(tasks: Collection<DownloadTask>): Boolean {
         if (tasks.isEmpty()) return false
-        ensureDownloadForeground() // Android: keep the process alive + show progress (Doki FGS); no-op on Desktop
         var startedAny = false
         for (task in tasks) {
             mangaDataRepository.storeManga(task.manga, replaceExisting = true)
-            val id = UUID.randomUUID().toString()
+            val id = task.manga.id.toString()
             this.tasks[id] = task
             val controller = Controller(MutableStateFlow(task.startPaused))
             controllers[id] = controller
@@ -176,6 +177,7 @@ class DownloadManager(
             }
             if (!task.startPaused) startedAny = true
         }
+        ensureDownloadForeground() // Android: keep the process alive + show progress (Doki FGS); no-op on Desktop
         return startedAny
     }
 
