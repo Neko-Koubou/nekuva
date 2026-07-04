@@ -67,17 +67,25 @@ class DownloadService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        // Resolve the channel name + action labels once (localized); a one-time in-memory resource read.
-        runCatching {
-            runBlocking {
-                channelName = getString(Res.string.downloads)
+        ensureChannel() // create channel immediately with default name
+        
+        // Resolve the channel name + action labels asynchronously (localized).
+        scope.launch {
+            runCatching {
+                val newChannelName = getString(Res.string.downloads)
                 pauseLabel = getString(Res.string.pause)
                 resumeLabel = getString(Res.string.resume)
                 cancelLabel = getString(Res.string.cancel)
                 cancelAllLabel = getString(Res.string.cancel_all)
+                
+                if (channelName != newChannelName) {
+                    channelName = newChannelName
+                    ensureChannel() // recreate/update channel with translated name
+                }
+            }.onFailure {
+                android.util.Log.e("DownloadService", "Failed to load strings", it)
             }
         }
-        ensureChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
