@@ -109,7 +109,10 @@ fun BackupSettingsScreen(
     }
 }
 
-private fun defaultBackupName(): String = "nekuva_backup_${System.currentTimeMillis()}.zip"
+private fun defaultBackupName(): String {
+    val dateString = java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.US).format(java.util.Date())
+    return "nekuva_$dateString.bk.zip"
+}
 
 /** Lets the user choose which sections to restore from the picked backup (Doki restore section picker). */
 @Composable

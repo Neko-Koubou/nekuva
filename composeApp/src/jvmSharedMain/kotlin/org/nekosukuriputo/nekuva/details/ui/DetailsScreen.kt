@@ -616,9 +616,7 @@ fun MangaDetailsContent(
                                 text = subtitle, 
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Start,
                                 modifier = Modifier.clickable {
                                     onAltTitleClick(subtitle)
                                 }.padding(horizontal = 4.dp, vertical = 2.dp)

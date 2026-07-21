@@ -141,10 +141,11 @@ class BackupRepository(
         val dir = java.io.File(dirPath)
         if (!dir.exists()) dir.mkdirs()
         if (!dir.isDirectory) return null
-        val file = java.io.File(dir, "nekuva_backup_${System.currentTimeMillis()}.zip")
+        val dateString = java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.US).format(java.util.Date())
+        val file = java.io.File(dir, "nekuva_$dateString.bk.zip")
         java.io.FileOutputStream(file).use { createBackup(it) }
         if (maxCount != Int.MAX_VALUE) {
-            dir.listFiles { f -> f.isFile && f.name.startsWith("nekuva_backup_") && f.name.endsWith(".zip") }
+            dir.listFiles { f -> f.isFile && f.name.startsWith("nekuva_") && f.name.endsWith(".zip") }
                 ?.sortedByDescending { it.name }
                 ?.drop(maxCount)
                 ?.forEach { runCatching { it.delete() } }

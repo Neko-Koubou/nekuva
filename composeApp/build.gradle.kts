@@ -97,7 +97,7 @@ val generateScrobblerSecrets by tasks.registering {
 // desktopPackageVersion is the INSTALLER version: jpackage/MSI/DMG require MAJOR.MINOR.PATCH with
 // MAJOR > 0 (so "-beta" / leading-zero majors are rejected). It's just for upgrade ordering – the
 // user-facing version is appVersion (AppInfo / About / release tag).
-val defaultVersion = "1.0.4"
+val defaultVersion = "1.0.5"
 val appVersion: String = (findProperty("appVersion") as String?)?.takeIf { it.isNotBlank() } ?: defaultVersion
 val appVersionCodeValue: Int = (findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 1
 val appVersionName: String = appVersion
@@ -154,7 +154,7 @@ kotlin {
                 // Coil network fetcher backed by the app OkHttp client (DoH + CloudFlare cookies + source headers)
                 // so protected-source covers/pages/thumbnails load like the parser does.
                 implementation(libs.coil.network)
-                implementation("com.github.NekoSukuriputo:nekuva-exts:v1.0.17") {
+                implementation("com.github.NekoSukuriputo:nekuva-exts:v1.0.19") {
                     exclude(group = "org.json", module = "json")
                 }
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")

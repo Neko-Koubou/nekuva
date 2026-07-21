@@ -261,7 +261,9 @@ class DetailsViewModel(
         viewModelScope.launch {
             runCatching {
                 val source = MangaParserSource.entries.find { it.name == manga.source.name } ?: return@launch
-                _relatedManga.value = repositoryFactory.create(source).getRelated(manga)
+                val related = repositoryFactory.create(source).getRelated(manga)
+                related.forEach { runCatching { mangaDataRepository.storeManga(it, replaceExisting = false) } }
+                _relatedManga.value = related
             }
         }
     }

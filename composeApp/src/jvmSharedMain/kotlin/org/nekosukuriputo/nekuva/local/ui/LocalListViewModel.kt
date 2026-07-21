@@ -1,4 +1,4 @@
-﻿package org.nekosukuriputo.nekuva.local.ui
+package org.nekosukuriputo.nekuva.local.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -131,6 +131,7 @@ class LocalListViewModel(
                     _uiState.value = LocalListUiState.Success(list)
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 _uiState.value = LocalListUiState.Error(e)
             }
         }

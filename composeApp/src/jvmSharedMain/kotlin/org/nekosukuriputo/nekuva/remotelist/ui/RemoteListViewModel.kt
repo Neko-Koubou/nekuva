@@ -313,6 +313,7 @@ class RemoteListViewModel(
                     )
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 when {
                     append && currentState is RemoteListUiState.Success ->
                         _uiState.value = currentState.copy(isAppending = false, hasNextPage = false)
