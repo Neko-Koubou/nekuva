@@ -52,9 +52,9 @@ jobs:
 
           ## Downloads
           - **Android** — `…-android-universal.apk` if unsure, or match your CPU (`arm64-v8a` for most phones).
-          - **Windows** — `…-windows-x64.msi`
-          - **Linux** — `…-linux-amd64.deb` or `…-linux-x86_64.AppImage`
-          - **macOS** — `…-macos.dmg`
+          - **Windows** — `…-windows-x64.msi` or `…-windows-arm64.msi`
+          - **Linux** — `…-linux-amd64.deb` or `…-linux-arm64.deb` (also AppImage)
+          - **macOS** — `…-macos-x64.dmg` or `…-macos-apple-silicon.dmg`
 
           ## Notes
           - **macOS:** the `.dmg` is unsigned / un-notarized → right-click the app and choose **Open** to bypass Gatekeeper.
@@ -275,7 +275,7 @@ jobs:
   macos:
     name: macOS installer (.dmg)
     needs: create-release
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -305,7 +305,166 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p dist
           dmg="$(ls composeApp/build/compose/binaries/main/dmg/*.dmg | head -n1)"
-          cp "$dmg" "dist/Nekuva-${VERSION}-macos.dmg"
+          cp "$dmg" "dist/Nekuva-${VERSION}-macos-x64.dmg"
+          ls -la dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Nekuva ${{ github.ref_name }}
+          prerelease: false
+          make_latest: true
+          fail_on_unmatched_files: true
+          files: dist/*.dmg
+
+  windows-arm:
+    name: Windows ARM64 installer (.msi)
+    needs: create-release
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Ensure WiX Toolset 3
+        shell: bash
+        run: choco install wixtoolset -y --no-progress || echo "WiX already present — continuing."
+      - name: Build MSI
+        shell: bash
+        env:
+          TG_BACKUP_BOT_TOKEN: ${{ secrets.TG_BACKUP_BOT_TOKEN }}
+          ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
+          ANILIST_CLIENT_SECRET: ${{ secrets.ANILIST_CLIENT_SECRET }}
+          MAL_CLIENT_ID: ${{ secrets.MAL_CLIENT_ID }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NUMERIC="${VERSION%%-*}"
+          if [ "${NUMERIC%%.*}" = "0" ]; then DESKTOP_VER="1.0.0"; else DESKTOP_VER="$NUMERIC"; fi
+          ./gradlew :composeApp:packageMsi \
+            -PappVersionName="$VERSION" -PdesktopPackageVersion="$DESKTOP_VER"
+      - name: Collect MSI
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          msi="$(ls composeApp/build/compose/binaries/main/msi/*.msi | head -n1)"
+          cp "$msi" "dist/Nekuva-${VERSION}-windows-arm64.msi"
+          ls -la dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Nekuva ${{ github.ref_name }}
+          prerelease: false
+          make_latest: true
+          fail_on_unmatched_files: true
+          files: dist/*.msi
+
+  linux-arm:
+    name: Linux ARM64 installers (.deb, .AppImage)
+    needs: create-release
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y fakeroot binutils file
+      - name: Build .deb + app image
+        shell: bash
+        env:
+          TG_BACKUP_BOT_TOKEN: ${{ secrets.TG_BACKUP_BOT_TOKEN }}
+          ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
+          ANILIST_CLIENT_SECRET: ${{ secrets.ANILIST_CLIENT_SECRET }}
+          MAL_CLIENT_ID: ${{ secrets.MAL_CLIENT_ID }}
+        run: |
+          chmod +x gradlew
+          VERSION="${GITHUB_REF_NAME#v}"
+          NUMERIC="${VERSION%%-*}"
+          if [ "${NUMERIC%%.*}" = "0" ]; then DESKTOP_VER="1.0.0"; else DESKTOP_VER="$NUMERIC"; fi
+          ./gradlew :composeApp:packageDeb :composeApp:createDistributable \
+            -PappVersionName="$VERSION" -PdesktopPackageVersion="$DESKTOP_VER"
+      - name: Build .AppImage
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          APPDIR="Nekuva.AppDir"
+          APPRUNTIME="$(ls -d composeApp/build/compose/binaries/main/app/Nekuva)"
+          rm -rf "$APPDIR" && mkdir -p "$APPDIR/usr"
+          cp -r "$APPRUNTIME"/* "$APPDIR/usr/"
+          cp composeApp/src/desktopMain/resources/nekuva_icon.png "$APPDIR/nekuva.png"
+          cat > "$APPDIR/nekuva.desktop" <<'DESKTOP'
+          [Desktop Entry]
+          Type=Application
+          Name=Nekuva
+          Exec=Nekuva
+          Icon=nekuva
+          Categories=Graphics;Viewer;
+          DESKTOP
+          cat > "$APPDIR/AppRun" <<'APPRUN'
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec "$HERE/usr/bin/Nekuva" "$@"
+          APPRUN
+          chmod +x "$APPDIR/AppRun"
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage -O appimagetool
+          chmod +x appimagetool
+          ./appimagetool --appimage-extract-and-run "$APPDIR" "Nekuva-${VERSION}-linux-aarch64.AppImage"
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          deb="$(ls composeApp/build/compose/binaries/main/deb/*.deb | head -n1)"
+          cp "$deb" "dist/Nekuva-${VERSION}-linux-arm64.deb"
+          cp "Nekuva-${VERSION}-linux-aarch64.AppImage" dist/
+          ls -la dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Nekuva ${{ github.ref_name }}
+          prerelease: false
+          make_latest: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/*.deb
+            dist/*.AppImage
+
+  macos-arm:
+    name: macOS ARM64 installer (.dmg)
+    needs: create-release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Build .dmg
+        shell: bash
+        env:
+          TG_BACKUP_BOT_TOKEN: ${{ secrets.TG_BACKUP_BOT_TOKEN }}
+          ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
+          ANILIST_CLIENT_SECRET: ${{ secrets.ANILIST_CLIENT_SECRET }}
+          MAL_CLIENT_ID: ${{ secrets.MAL_CLIENT_ID }}
+        run: |
+          chmod +x gradlew
+          VERSION="${GITHUB_REF_NAME#v}"
+          NUMERIC="${VERSION%%-*}"
+          if [ "${NUMERIC%%.*}" = "0" ]; then DESKTOP_VER="1.0.0"; else DESKTOP_VER="$NUMERIC"; fi
+          ./gradlew :composeApp:packageDmg \
+            -PappVersionName="$VERSION" -PdesktopPackageVersion="$DESKTOP_VER"
+      - name: Collect DMG
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          dmg="$(ls composeApp/build/compose/binaries/main/dmg/*.dmg | head -n1)"
+          cp "$dmg" "dist/Nekuva-${VERSION}-macos-apple-silicon.dmg"
           ls -la dist
       - uses: softprops/action-gh-release@v2
         with:
