@@ -7,6 +7,7 @@ import java.io.File
 actual class AppContext
 
 actual fun getDatabaseBuilder(ctx: AppContext): RoomDatabase.Builder<NekuvaDatabase> {
-    val dbFile = File(System.getProperty("java.io.tmpdir"), "nekuva.db")
+    val dbDir = File(File(System.getProperty("user.home"), ".nekuva"), "db").apply { mkdirs() }
+    val dbFile = File(dbDir, "nekuva.db")
     return Room.databaseBuilder<NekuvaDatabase>(name = dbFile.absolutePath)
 }
