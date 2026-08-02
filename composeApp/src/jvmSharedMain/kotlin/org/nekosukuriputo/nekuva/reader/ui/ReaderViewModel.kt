@@ -63,6 +63,7 @@ data class ReaderChapterItem(
     val isDownloaded: Boolean = false,
     // True for chapters before the current one (Doki: read → greyed in the sheet).
     val isRead: Boolean = false,
+    val uploadDate: Long = 0L,
 )
 
 /** A translation/scanlation branch for the reader's branch selector (Doki's MangaBranch). */
@@ -842,6 +843,7 @@ class ReaderViewModel(
                         isCurrent = c.id == currentChapterId,
                         isRead = curIdx >= 0 && i < curIdx,
                         isDownloaded = c.id in downloadedChapterIds,
+                        uploadDate = c.uploadDate,
                     )
                 }
             },

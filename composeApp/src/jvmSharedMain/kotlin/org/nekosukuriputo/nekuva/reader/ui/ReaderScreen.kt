@@ -1181,7 +1181,11 @@ private fun ReaderChaptersSheet(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-                                    Text("#${ch.number}", style = MaterialTheme.typography.bodySmall, color = if (ch.isRead && !ch.isCurrent) readDim else MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (ch.uploadDate > 0L) {
+                                        Text(org.nekosukuriputo.nekuva.core.util.ext.calculateTimeAgo(ch.uploadDate), style = MaterialTheme.typography.bodySmall, color = if (ch.isRead && !ch.isCurrent) readDim else MaterialTheme.colorScheme.onSurfaceVariant)
+                                    } else {
+                                        Text("#${ch.number}", style = MaterialTheme.typography.bodySmall, color = if (ch.isRead && !ch.isCurrent) readDim else MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
                                 }
                                 // Downloaded chapter → SD-card badge (Doki reader chapters list parity).
                                 if (ch.isDownloaded) {
