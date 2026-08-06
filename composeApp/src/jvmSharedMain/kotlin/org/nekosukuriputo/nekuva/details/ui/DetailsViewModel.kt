@@ -304,10 +304,18 @@ class DetailsViewModel(
 
             if (base.isLocal) {
                 // Local manga read their chapters from the file.
-                val local = localMangaRepository.getDetails(base)
-                mangaDataRepository.storeManga(local, replaceExisting = true)
-                finishLoad(local)
-                return
+                val local = runCatching { localMangaRepository.getDetails(base) }.getOrNull()
+                if (local != null) {
+                    mangaDataRepository.storeManga(local, replaceExisting = true)
+                    finishLoad(local)
+                    return
+                } else {
+                    // It's a local manga but the file is missing!
+                    // This could be a corrupted remote manga (from a previous bug) or a genuinely deleted local manga.
+                    // Delete the corrupted database entry so it can be re-fetched correctly next time.
+                    mangaDataRepository.delete(base)
+                    throw IllegalStateException("Manga source file is missing. The corrupted database entry has been cleared. Please open this manga again.")
+                }
             }
 
             val source = MangaParserSource.entries.find { it.name == base.source.name }
@@ -319,8 +327,12 @@ class DetailsViewModel(
                 // replaceExisting = true so the downloaded copy's CHAPTERS reach the DB — the reader
                 // resolves a downloaded chapter by id via findMangaById(withChapters), which otherwise
                 // returns the chapter-less restored row ("Chapter with ID … not found").
-                mangaDataRepository.storeManga(saved, replaceExisting = true)
-                finishLoad(saved)
+                val mergedManga = base.copy(
+                    chapters = saved.chapters,
+                    description = saved.description ?: base.description,
+                )
+                mangaDataRepository.storeManga(mergedManga, replaceExisting = true)
+                finishLoad(mergedManga)
                 if (source != null) {
                     val fresh = runCatching { repositoryFactory.create(source).getDetails(base) }.getOrNull()
                     if (fresh != null) {
@@ -345,8 +357,12 @@ class DetailsViewModel(
                         val savedFallback = findSavedCopy(base)
                         when {
                             savedFallback != null -> {
-                                mangaDataRepository.storeManga(savedFallback, replaceExisting = true)
-                                finishLoad(savedFallback)
+                                val mergedFallback = base.copy(
+                                    chapters = savedFallback.chapters,
+                                    description = savedFallback.description ?: base.description,
+                                )
+                                mangaDataRepository.storeManga(mergedFallback, replaceExisting = true)
+                                finishLoad(mergedFallback)
                             }
                             !base.chapters.isNullOrEmpty() -> finishLoad(base)
                             // Only replace the screen with an error on the initial load — a failed refresh

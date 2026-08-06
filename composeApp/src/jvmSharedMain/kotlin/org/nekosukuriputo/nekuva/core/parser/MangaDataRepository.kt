@@ -1,4 +1,4 @@
-﻿package org.nekosukuriputo.nekuva.core.parser
+package org.nekosukuriputo.nekuva.core.parser
 
 import androidx.collection.LongObjectMap
 import androidx.collection.MutableLongObjectMap
@@ -155,6 +155,12 @@ class MangaDataRepository (
 		val chapters = manga.chapters
 		if (!chapters.isNullOrEmpty() && manga.id in db.getMangaDao()) {
 			db.getChaptersDao().replaceAll(manga.id, chapters.withIndex().toEntities(manga.id))
+		}
+	}
+
+	suspend fun delete(manga: Manga) {
+		db.withTransactionKmp {
+			db.getMangaDao().delete(listOf(manga.toEntity()))
 		}
 	}
 
