@@ -210,7 +210,7 @@ class MangaSourcesRepository(
 	}.onStart { assimilateNewSources() }
 
 	fun observeHasNewSourcesForBadge(): Flow<Boolean> = combine(
-		settings.observeAsFlow(AppSettings.KEY_SOURCES_VERSION) { sourcesVersion },
+			settings.observeInt(AppSettings.KEY_SOURCES_VERSION, 0),
 		observeIsNsfwDisabled(),
 	) { version, skipNsfw ->
 		if (version < 1) {
@@ -330,17 +330,13 @@ class MangaSourcesRepository(
 		return result
 	}
 
-	private fun observeIsNsfwDisabled() = settings.observeAsFlow(AppSettings.KEY_DISABLE_NSFW) {
-		isNsfwContentDisabled
-	}
+	private fun observeIsNsfwDisabled() = settings.observeBoolean(AppSettings.KEY_DISABLE_NSFW, false)
 
 	private fun observeSortOrder() = settings.observeAsFlow(AppSettings.KEY_SOURCES_ORDER) {
 		sourcesSortOrder
 	}
 
-	private fun observeAllEnabled() = settings.observeAsFlow(AppSettings.KEY_SOURCES_ENABLED_ALL) {
-		isAllSourcesEnabled
-	}
+	private fun observeAllEnabled() = settings.observeBoolean(AppSettings.KEY_SOURCES_ENABLED_ALL, false)
 
 	private fun String.toMangaSourceOrNull(): MangaParserSource? = MangaParserSource.entries.find { it.name == this }
 }
