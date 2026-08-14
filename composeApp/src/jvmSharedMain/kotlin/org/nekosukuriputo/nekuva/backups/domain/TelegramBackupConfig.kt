@@ -3,7 +3,7 @@ package org.nekosukuriputo.nekuva.backups.domain
 /**
  * Telegram backup-upload credentials (Doki `tg_backup_bot_token` / `tg_backup_bot_name`).
  *
- * Nekuva reuses **Kotatsu's public backup bot** ([BOT_NAME] = `kotatsu_backup_bot`), exactly like Doki: the
+ * Nekuva uses its own backup bot ([BOT_NAME] = `nekuva_app_bot`): the
  * user messages that bot to get their chat id, and the app uploads backups via the bot.
  *
  * The bot **token** is a secret and is NOT stored in source (Doki injects it at build time too). It comes from
@@ -11,12 +11,12 @@ package org.nekosukuriputo.nekuva.backups.domain
  * `tg_backup_bot_token` (local.properties / `-Dtg_backup_bot_token` / `TG_BACKUP_BOT_TOKEN` env). When empty,
  * [isAvailable] is false and the whole Telegram section stays hidden (matching Doki's default).
  *
- * To enable: put the Kotatsu backup bot token (or your own bot's, with [BOT_NAME] changed) into
+ * To enable: put the Nekuva backup bot token into
  * `local.properties` as `tg_backup_bot_token=...` and rebuild. // TODO(credentials)
  */
 object TelegramBackupConfig {
     val BOT_TOKEN: String get() = TelegramSecrets.BOT_TOKEN
-    const val BOT_NAME: String = "kotatsu_backup_bot"
+    const val BOT_NAME: String = "nekuva_app_bot"
 
     val isAvailable: Boolean get() = BOT_TOKEN.isNotEmpty()
 }
