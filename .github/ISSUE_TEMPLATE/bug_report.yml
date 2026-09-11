@@ -17,7 +17,7 @@ body:
       options:
         - label: I'm on the **latest** Nekuva release (or the bug still happens there)
           required: true
-        - label: I searched [existing issues](https://github.com/NekoSukuriputo/nekuva/issues) and found no duplicate
+        - label: I searched [existing issues](https://github.com/Neko-Koubou/nekuva/issues) and found no duplicate
           required: true
   - type: input
     id: version

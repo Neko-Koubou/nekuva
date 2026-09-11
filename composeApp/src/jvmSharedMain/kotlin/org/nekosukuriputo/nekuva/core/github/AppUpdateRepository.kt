@@ -52,6 +52,6 @@ class AppUpdateRepository(
     }
 
     private companion object {
-        const val REPO = "NekoSukuriputo/nekuva"
+        const val REPO = "Neko-Koubou/nekuva"
     }
 }

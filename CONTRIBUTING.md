@@ -7,12 +7,12 @@ Thanks for your interest in improving **Nekuva**! This guide covers contributing
 
 - This repository is the **UI application** only.
 - **New manga sources, or fixes to existing sources, do NOT belong here.** They live in the separate
-  parser library, **[nekuva-exts](https://github.com/NekoSukuriputo/nekuva-exts)**. Nekuva never
+  parser library, **[nekuva-exts](https://github.com/Neko-Koubou/nekuva-exts)**. Nekuva never
   contains site-specific scraping code — please send source work there.
 
 ## Before you start
 
-- For **bug fixes** that already have an [issue](https://github.com/NekoSukuriputo/nekuva/issues):
+- For **bug fixes** that already have an [issue](https://github.com/Neko-Koubou/nekuva/issues):
   comment on it so others know you're working on it.
 - For **new features** or larger changes: open an issue or discussion first, so the approach can be
   agreed on before you invest time.
@@ -23,7 +23,7 @@ Thanks for your interest in improving **Nekuva**! This guide covers contributing
 Requirements: **JDK 17** and, for the Android target, the **Android SDK**.
 
 ```bash
-git clone https://github.com/NekoSukuriputo/nekuva.git
+git clone https://github.com/Neko-Koubou/nekuva.git
 cd nekuva
 
 ./gradlew :composeApp:run            # run the Desktop app

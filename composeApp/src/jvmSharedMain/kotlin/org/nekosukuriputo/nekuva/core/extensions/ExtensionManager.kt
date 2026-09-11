@@ -18,7 +18,7 @@ import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicBoolean
 
 // Where the published catalog + per-platform artifacts live (GitHub Release "latest" assets of the exts repo).
-private const val RELEASE_BASE = "https://github.com/NekoSukuriputo/nekuva-exts/releases/latest/download/"
+private const val RELEASE_BASE = "https://github.com/Neko-Koubou/nekuva-exts/releases/latest/download/"
 
 @Serializable
 private data class ExtIndex(

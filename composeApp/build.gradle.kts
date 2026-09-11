@@ -97,10 +97,12 @@ val generateScrobblerSecrets by tasks.registering {
 // desktopPackageVersion is the INSTALLER version: jpackage/MSI/DMG require MAJOR.MINOR.PATCH with
 // MAJOR > 0 (so "-beta" / leading-zero majors are rejected). It's just for upgrade ordering – the
 // user-facing version is appVersion (AppInfo / About / release tag).
-val defaultVersion = "1.0.11"
+val defaultVersion = "1.0.12"
+val appCodename = "Kayden" // Change this per major update!
 val appVersion: String = (findProperty("appVersion") as String?)?.takeIf { it.isNotBlank() } ?: defaultVersion
 val appVersionCodeValue: Int = (findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 1
-val appVersionName: String = appVersion
+val rawVersionName = (findProperty("appVersionName") as String?)?.takeIf { it.isNotBlank() } ?: appVersion
+val appVersionName: String = if (rawVersionName.contains(appCodename, ignoreCase = true)) rawVersionName else "$rawVersionName-$appCodename"
 val desktopPackageVersion: String = appVersion
 
 // Generate AppInfo.VERSION_NAME from appVersionName so the running version (About / update check) has a
@@ -154,7 +156,7 @@ kotlin {
                 // Coil network fetcher backed by the app OkHttp client (DoH + CloudFlare cookies + source headers)
                 // so protected-source covers/pages/thumbnails load like the parser does.
                 implementation(libs.coil.network)
-                implementation("com.github.NekoSukuriputo:nekuva-exts:v1.0.20") {
+                implementation("com.github.Neko-Koubou:nekuva-exts:v1.0.23") {
                     exclude(group = "org.json", module = "json")
                 }
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
@@ -336,12 +338,12 @@ compose.desktop {
             packageName = "Nekuva"
             packageVersion = desktopPackageVersion
             description = "Nekuva — manga reader"
-            vendor = "NekoSukuriputo"
+            vendor = "Neko-Koubou"
             // Per-platform installer icons. Linux uses the PNG; Windows uses an .ico; macOS uses an .icns
             // (built in CI on the macOS runner — only wired when present so non-mac builds don't fail).
             linux {
                 iconFile.set(project.file("src/desktopMain/resources/nekuva_icon.png"))
-                debMaintainer = "noreply@nekosukuriputo.org"
+                debMaintainer = "noreply@nekosukuriputo.dev"
             }
             windows {
                 val ico = project.file("src/desktopMain/resources/nekuva_icon.ico")

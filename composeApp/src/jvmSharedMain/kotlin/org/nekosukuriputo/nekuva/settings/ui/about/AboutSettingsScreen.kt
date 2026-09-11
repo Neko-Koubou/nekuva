@@ -46,7 +46,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.nekosukuriputo.nekuva.settings.ui.components.SettingsItem
 
-private const val GITHUB_REPO = "https://github.com/NekoSukuriputo/nekuva"
+private const val GITHUB_REPO = "https://github.com/Neko-Koubou/nekuva"
 // Doki points the user manual at the Kotatsu guide (url_user_manual); reused here per the migration note.
 private const val USER_MANUAL_URL = "https://kotatsu.app/manuals/guides/getting-started/"
 private const val APP_VERSION = org.nekosukuriputo.nekuva.core.AppInfo.VERSION_NAME
@@ -124,7 +124,7 @@ fun AboutSettingsScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
             // App version → tap to check GitHub for a newer release (Doki app_version + AppUpdateRepository).
             SettingsItem(
-                title = "${stringResource(Res.string.app_name)} $APP_VERSION",
+                title = "${stringResource(Res.string.app_name)} v$APP_VERSION",
                 summary = if (isChecking) "$checking…" else checking,
                 icon = Icons.Outlined.Info,
                 enabled = !isChecking,

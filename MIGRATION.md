@@ -1067,7 +1067,7 @@ ThemeOverlay + `colors_themed.xml` 423 warna light + 423 dark), `ThemeChooserPre
     Doki pun disabled/TODO), **User manual** (→ link Kotatsu `https://kotatsu.app/manuals/...` sesuai catatan),
     **Source code** (→ GitHub Nekuva), **Translate this app** (disabled — belum ada Weblate Nekuva). Ikon per baris.
   - **Impact — update checker:** `AppUpdateRepository` (jvmShared) diimplementasi (dulu stub): query
-    `api.github.com/repos/NekoSukuriputo/nekuva/releases/latest`, bandingkan tag via `VersionId`, return
+    `api.github.com/repos/Neko-Koubou/nekuva/releases/latest`, bandingkan tag via `VersionId`, return
     `AppVersion?`. `AboutSettingsViewModel.checkForUpdates` → snackbar **"Versi baru: X"** (aksi ↗ buka rilis)
     atau **"Anda menggunakan versi terbaru"**. String baru `youre_using_the_latest_version` (en/id/in).
 - **9B ✅ DONE — Ikon aplikasi (Android + Desktop, compile + assembleDebug hijau):** dari `logo/logo.png`
@@ -1683,7 +1683,7 @@ Fitur fondasi yang dipakai banyak layar. Mengerjakan ini lebih dulu membuat migr
      build "extension package" Android (ini kerjaan baru di repo exts).
 4. **Katalog/index ter-publish**: rilis GitHub atau `index.json` di repo berisi: versi terbaru, URL unduh
    per-platform, min host ABI, metadata per-sumber, **checksum + signature**.
-5. **Signing artefak** → host verifikasi keaslian (HANYA build NekoSukuriputo yang dimuat). Wajib, karena
+5. **Signing artefak** → host verifikasi keaslian (HANYA build Neko-Koubou yang dimuat). Wajib, karena
    memuat kode dari internet itu sensitif (lihat catatan keamanan harness).
 
 **Sisi host (repo UI ini) yang berubah:**

@@ -41,7 +41,7 @@ repeat that. Specifically:
 
 - **Nekuva** is the **UI application** of a manga reader (a Kotatsu/Doki-class app).
 - It originated as a fork of DokiTeam/Doki, but **this is now an independent project,
-  "Nekuva" by NekoSukuriputo.** Canonical package / namespace / applicationId:
+  "Nekuva" by Neko-Koubou.** Canonical package / namespace / applicationId:
   **`org.nekosukuriputo.nekuva`**. The old `org.dokiteam.doki` and the "Doki" brand are
   **fully retired.**
 - **BRANDING RULE — no "doki" anywhere.** Never introduce `doki`, `dokiteam`, `DokiApp`,
@@ -353,7 +353,7 @@ never paper over it with a stub/mock to fake a green/"done" state.
   - Do not add scraping/site-specific logic here. New sources go to `nekuva-exts`. If asked to
     add a site parser here, refuse and redirect.
   - Consume exts as a **versioned published dependency**:
-    `com.github.NekoSukuriputo:nekuva-exts:<tag>` with `exclude(group = "org.json", module = "json")`.
+    `com.github.Neko-Koubou:nekuva-exts:<tag>` with `exclude(group = "org.json", module = "json")`.
     Import from `org.nekosukuriputo.nekuva.parsers.*` — **never** `org.dokiteam.doki.parsers.*`
     (that means the old doki-exts is being pulled and must be fixed). Update the version in
     `libs.versions.toml`; do not vendor the source.

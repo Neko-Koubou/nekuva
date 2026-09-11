@@ -21,7 +21,7 @@ and keep a local library — on **Android**, **Desktop (Windows, macOS & Linux)*
 **iOS** from a single shared codebase.
 
 Manga sources (the parsers/scrapers) live in a separate repository,
-**[nekuva-exts](https://github.com/NekoSukuriputo/nekuva-exts)**, which Nekuva consumes as a
+**[nekuva-exts](https://github.com/Neko-Koubou/nekuva-exts)**, which Nekuva consumes as a
 published dependency. This keeps the UI app and the source library cleanly separated.
 
 > **Project status:** Nekuva is under active development. It started as a fork of
@@ -53,7 +53,7 @@ published dependency. This keeps the UI app and the source library cleanly separ
 | Preferences | multiplatform-settings |
 | Navigation | Compose Navigation (type-safe routes) |
 | Dates / i18n | kotlinx-datetime + Compose Resources |
-| Sources | [nekuva-exts](https://github.com/NekoSukuriputo/nekuva-exts) (JitPack) |
+| Sources | [nekuva-exts](https://github.com/Neko-Koubou/nekuva-exts) (JitPack) |
 
 ### Source-set layout
 
@@ -95,9 +95,9 @@ Native installers (`.msi` / `.dmg` / `.deb`):
 
 Bug reports and pull requests are welcome.
 
-- **App issues:** <https://github.com/NekoSukuriputo/nekuva/issues>
+- **App issues:** <https://github.com/Neko-Koubou/nekuva/issues>
 - **New manga sources / source fixes:** these belong in
-  **[nekuva-exts](https://github.com/NekoSukuriputo/nekuva-exts)**, *not* this repo — Nekuva never
+  **[nekuva-exts](https://github.com/Neko-Koubou/nekuva-exts)**, *not* this repo — Nekuva never
   contains site-specific scraping code.
 
 ## Credits & lineage
@@ -105,7 +105,7 @@ Bug reports and pull requests are welcome.
 Nekuva is a fork of [DokiTeam/Doki](https://github.com/DokiTeam/Doki), which is itself based on
 [KotatsuApp/Kotatsu](https://github.com/KotatsuApp/Kotatsu). Huge thanks to the Doki and Kotatsu
 teams and all upstream contributors. Nekuva is now developed independently by
-[NekoSukuriputo](https://github.com/NekoSukuriputo).
+[Neko-Koubou](https://github.com/Neko-Koubou).
 
 ## License
 

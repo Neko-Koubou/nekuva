@@ -126,6 +126,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           NUMERIC="${VERSION%%-*}"
           # jpackage/MSI/DMG installer version needs MAJOR > 0; 0.0.x betas fall back to 1.0.0.
+          # NUMERIC safely strips suffixes (e.g. from "1.0.11-Kayden" to "1.0.11") for the installer.
           if [ "${NUMERIC%%.*}" = "0" ]; then DESKTOP_VER="1.0.0"; else DESKTOP_VER="$NUMERIC"; fi
           ./gradlew :composeApp:assembleRelease \
             -PappVersionName="$VERSION" \

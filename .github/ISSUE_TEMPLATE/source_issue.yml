@@ -8,7 +8,7 @@ body:
       value: |
         Use this when **one source** misbehaves but the rest of the app works fine.
 
-        > ⚠️ The source parsers live in the separate **[nekuva-exts](https://github.com/NekoSukuriputo/nekuva-exts)** repo.
+        > ⚠️ The source parsers live in the separate **[nekuva-exts](https://github.com/Neko-Koubou/nekuva-exts)** repo.
         > If a source broke because its website changed (a parser bug) or you want a **new** source, report that there.
         > Use this template when it looks app-side — e.g. it works in another Kotatsu/Doki app but not in Nekuva.
   - type: input
