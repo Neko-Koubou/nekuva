@@ -45,7 +45,7 @@ object KcefManager {
         data class Failed(val error: Throwable?) : State
     }
 
-    private const val KCEF_CACHE_VERSION = 2 // Bump this if Compose/Skiko/KCEF updates to avoid native ABI crashes
+    private const val KCEF_CACHE_VERSION = 3 // Bump this if Compose/Skiko/KCEF updates to avoid native ABI crashes
 
     private val installDir = File(System.getProperty("user.home"), ".nekuva/kcef")
 
@@ -72,7 +72,16 @@ object KcefManager {
                     installDir.deleteRecursively()
                 }
                 installDir.mkdirs()
-                versionFile.writeText(currentVersion)
+
+                // Clean up CEF Singleton locks. If the app previously force-closed or crashed,
+                // these files are left behind and will cause KCEF to instantly crash (EXC_BAD_ACCESS)
+                // in CefInitialize-thread on the next launch.
+                runCatching {
+                    val cacheDir = File(installDir, "cache")
+                    File(cacheDir, "SingletonLock").delete()
+                    File(cacheDir, "SingletonSocket").delete()
+                    File(cacheDir, "SingletonCookie").delete()
+                }
 
                 _state.value = State.Initializing
                 KCEF.init(
@@ -88,7 +97,12 @@ object KcefManager {
                         )
                         progress {
                             onDownloading { pct -> _state.value = State.Downloading(pct.coerceIn(0f, 100f)) }
-                            onInitialized { _state.value = State.Ready }
+                            onInitialized {
+                                // Only mark the cache as complete AFTER successful initialization.
+                                // If written before, an interrupted download would leave the cache permanently corrupted.
+                                runCatching { versionFile.writeText(currentVersion) }
+                                _state.value = State.Ready
+                            }
                         }
                         settings {
                             cachePath = File(installDir, "cache").absolutePath
