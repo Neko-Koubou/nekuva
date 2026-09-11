@@ -45,6 +45,8 @@ object KcefManager {
         data class Failed(val error: Throwable?) : State
     }
 
+    private const val KCEF_CACHE_VERSION = 2 // Bump this if Compose/Skiko/KCEF updates to avoid native ABI crashes
+
     private val installDir = File(System.getProperty("user.home"), ".nekuva/kcef")
 
     private val _state = MutableStateFlow<State>(State.Idle)
@@ -62,6 +64,16 @@ object KcefManager {
         started = true
         scope.launch {
             runCatching {
+                val versionFile = File(installDir.parentFile, "kcef_cache_version.txt")
+                val currentVersion = KCEF_CACHE_VERSION.toString()
+                // Wipe the old native libraries if upgrading from an older KCEF cache version,
+                // or if upgrading from a version before this check existed (no version file).
+                if (installDir.exists() && (!versionFile.exists() || versionFile.readText().trim() != currentVersion)) {
+                    installDir.deleteRecursively()
+                }
+                installDir.mkdirs()
+                versionFile.writeText(currentVersion)
+
                 _state.value = State.Initializing
                 KCEF.init(
                     builder = {
