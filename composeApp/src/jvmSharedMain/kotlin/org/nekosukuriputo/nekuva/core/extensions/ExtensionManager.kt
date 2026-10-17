@@ -121,6 +121,10 @@ class ExtensionManager(
      * locally imported, the ABI/platform doesn't match, or the signature is invalid.
      */
     suspend fun checkForUpdate(): Boolean = withContext(Dispatchers.IO) {
+        if (extensionPlatformKey == "ios") {
+            _updateAvailable.value = false
+            return@withContext false
+        }
         runCatching {
             val installed = settings.installedExtensionVersion
             // Only nag when a published (versioned) bundle is installed — not for built-in or locally imported.
@@ -138,6 +142,11 @@ class ExtensionManager(
     /** Check the published catalog and download/install if newer (or not yet installed). */
     suspend fun checkAndUpdate(): Boolean = withContext(Dispatchers.IO) {
         _state.value = ExtState.Working
+        if (extensionPlatformKey == "ios") {
+            _updateAvailable.value = false
+            _state.value = ExtState.UpToDate
+            return@withContext true
+        }
         runCatching {
             // Verify the catalog signature before trusting it (only the maintainer's signed bundles).
             // index.json's sha256 then gates the artifacts. Bootstrap: passes when no key is configured.

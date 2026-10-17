@@ -98,6 +98,8 @@ val generateScrobblerSecrets by tasks.registering {
 // MAJOR > 0 (so "-beta" / leading-zero majors are rejected). It's just for upgrade ordering – the
 // user-facing version is appVersion (AppInfo / About / release tag).
 val defaultVersion = "1.0.14"
+val defaultExtsVersion = "v1.0.23"
+val nekuvaExts = "com.github.Neko-Koubou:nekuva-exts:$defaultExtsVersion"
 val appCodename = "Kayden" // Change this per major update!
 val appVersion: String = (findProperty("appVersion") as String?)?.takeIf { it.isNotBlank() } ?: defaultVersion
 val appVersionCodeValue: Int = (findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 1
@@ -130,6 +132,97 @@ val generateAppInfo by tasks.registering {
     }
 }
 
+val syncIosSharedSources by tasks.registering {
+    description = "Syncs commonMain and jvmSharedMain Kotlin sources into iosSharedMain with K/N compatibility transforms."
+    val commonSrcDir = layout.projectDirectory.dir("src/commonMain/kotlin").asFile
+    val jvmSharedSrcDir = layout.projectDirectory.dir("src/jvmSharedMain/kotlin").asFile
+    val outDir = layout.buildDirectory.dir("generated/iosSharedSources/kotlin")
+    inputs.dir(commonSrcDir)
+    inputs.dir(jvmSharedSrcDir)
+    outputs.dir(outDir)
+
+    doLast {
+        val outRoot = outDir.get().asFile
+        if (outRoot.exists()) {
+            outRoot.deleteRecursively()
+        }
+        outRoot.mkdirs()
+
+        val jvmAnnotationLineRegex = Regex("""^\s*@file:JvmName\([^)]*\)\s*$""")
+        val inlineJvmAnnotationsRegex = Regex("""@(?:JvmInline|JvmField|JvmStatic|JvmOverloads|JvmSuppressWildcards|JvmWildcard|Synchronized|Volatile|Transient)\b\s*""")
+        val suppressWarningsRegex = Regex("""@SuppressWarnings\b""")
+        val enumSetNoneOfRegex = Regex("""EnumSet\.noneOf\(([A-Za-z0-9_.]+)::class\.java\)""")
+        val enumSetAllOfRegex = Regex("""EnumSet\.allOf\(([A-Za-z0-9_.]+)::class\.java\)""")
+        val lruLinkedHashMapRegex = Regex("""object\s*:\s*LinkedHashMap<""")
+        val threadLocalWithInitialRegex = Regex("""\bThreadLocal\.withInitial\b""")
+        val threadLocalTypeRegex = Regex("""\bThreadLocal<""")
+        val dotIsFileRegex = Regex("""(?<!\?)\.isFile\b(?!\s*\()""")
+        val dotIsDirectoryRegex = Regex("""(?<!\?)\.isDirectory\b(?!\s*\()""")
+
+        for ((subName, srcRoot) in listOf("common" to commonSrcDir, "jvmShared" to jvmSharedSrcDir)) {
+            if (!srcRoot.exists()) continue
+            srcRoot.walkTopDown()
+                .filter {
+                    it.isFile &&
+                        it.extension == "kt" &&
+                        it.name != "DateUtil.jvm.kt" &&
+                        it.name != "ExtensionClassLoaderSupport.kt"
+                }
+                .forEach { srcFile ->
+                    val relPath = srcFile.relativeTo(srcRoot).path
+                    val destFile = outRoot.resolve(subName).resolve(relPath)
+                    destFile.parentFile.mkdirs()
+                    val lines = srcFile.readLines()
+                    val sb = StringBuilder(srcFile.length().toInt() + 128)
+                    var packageSeen = false
+                    for (line in lines) {
+                        val rawLine = line.removePrefix("\uFEFF")
+                        val trimmed = rawLine.trim()
+                        if (
+                            jvmAnnotationLineRegex.matches(rawLine) ||
+                            trimmed == "import kotlin.text.toBigDecimalOrNull" ||
+                            trimmed == "import okio.Path.Companion.toOkioPath"
+                        ) {
+                            continue
+                        }
+                        var cleaned = inlineJvmAnnotationsRegex.replace(rawLine, "")
+                        cleaned = suppressWarningsRegex.replace(cleaned, "@Suppress")
+                        cleaned = enumSetNoneOfRegex.replace(cleaned, "EnumSet.noneOf<$1>()")
+                        cleaned = enumSetAllOfRegex.replace(cleaned, "EnumSet.allOf<$1>()")
+                        cleaned = lruLinkedHashMapRegex.replace(cleaned, "object : LruLinkedHashMap<")
+                        cleaned = threadLocalWithInitialRegex.replace(cleaned, "JavaThreadLocal.withInitial")
+                        cleaned = threadLocalTypeRegex.replace(cleaned, "JavaThreadLocal<")
+                        if (!trimmed.startsWith("import ")) {
+                            cleaned = dotIsFileRegex.replace(cleaned, ".isFile()")
+                            cleaned = dotIsDirectoryRegex.replace(cleaned, ".isDirectory()")
+                        }
+                        cleaned = cleaned.replace("get() = isFile &&", "get() = isFile() &&")
+                        cleaned = cleaned.replace("isDirectory &&", "isDirectory() &&")
+                        cleaned = cleaned.replace("isDirectory ->", "isDirectory() ->")
+                        cleaned = cleaned.replace(": IOException(cause)", ": IOException(cause?.message, cause)")
+                        cleaned = cleaned.replace("class AlphanumComparator : Comparator<String>", "class AlphanumComparator : Comparator<String?>")
+                        cleaned = cleaned.replace("fun <T> Class<T>.castOrNull", "fun <T : Any> Class<T>.castOrNull")
+                        cleaned = cleaned.replace(
+                            "override fun removeEldestEntry(eldest: Map.Entry<K, V>): Boolean",
+                            "override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?): Boolean",
+                        )
+                        cleaned = cleaned.replace(
+                            "return java.net.URI(scheme, uri.userInfo, uri.host, uri.port, path, uri.query, fragment)",
+                            "return buildMultiArgUri(scheme, uri.userInfo, uri.host, uri.port, path, uri.query, fragment)",
+                        )
+                        sb.append(cleaned).append('\n')
+                        if (!packageSeen && cleaned.trimStart().startsWith("package ")) {
+                            packageSeen = true
+                            sb.append("import org.nekosukuriputo.nekuva.ioscompat.*\n")
+                            sb.append("import kotlinx.coroutines.IO\n")
+                        }
+                    }
+                    destFile.writeText(sb.toString())
+                }
+        }
+    }
+}
+
 kotlin {
     androidTarget {
         compilerOptions {
@@ -142,30 +235,34 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
-    
-    sourceSets {
-        val jvmSharedMain by creating {
-            dependsOn(commonMain.get())
-            kotlin.srcDir(generateTelegramSecrets)
-            kotlin.srcDir(generateScrobblerSecrets)
-            kotlin.srcDir(generateAppInfo)
-            dependencies {
-                implementation(libs.ktor.client.okhttp)
-                implementation(libs.okhttp.tls)
-                implementation(libs.okhttp.dnsoverhttps)
-                // Coil network fetcher backed by the app OkHttp client (DoH + CloudFlare cookies + source headers)
-                // so protected-source covers/pages/thumbnails load like the parser does.
-                implementation(libs.coil.network)
-                implementation("com.github.Neko-Koubou:nekuva-exts:v1.0.23") {
-                    exclude(group = "org.json", module = "json")
+
+    listOf(
+        iosArm64(),
+        iosSimulatorArm64(),
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "ComposeApp"
+            isStatic = true
+        }
+        iosTarget.compilations.all {
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.addAll(
+                        "-opt-in=kotlin.RequiresOptIn",
+                        "-opt-in=kotlin.contracts.ExperimentalContracts",
+                        "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+                        "-opt-in=org.nekosukuriputo.nekuva.parsers.InternalParsersApi",
+                        "-opt-in=kotlin.experimental.ExperimentalNativeApi",
+                        "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
+                    )
                 }
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-                // org.json for MangaIndex (download index.json). compileOnly: Android bundles it in the
-                // platform; Desktop provides it via desktopMain's implementation(libs.json) at runtime.
-                compileOnly(libs.json)
             }
         }
+    }
+    
+    sourceSets {
         val commonMain by getting {
+            kotlin.exclude("org/**")
             dependencies {
                 implementation(compose.runtime)
                 implementation(compose.foundation)
@@ -194,6 +291,57 @@ kotlin {
                 implementation(libs.lifecycle.viewmodel.compose)
                 implementation(libs.koin.compose.viewmodel)
             }
+        }
+        val jvmCommonMain by creating {
+            dependsOn(commonMain)
+            kotlin.srcDir("src/commonMain/kotlin")
+            dependencies {
+                implementation(libs.okhttp)
+                implementation(nekuvaExts) {
+                    exclude(group = "org.json", module = "json")
+                }
+            }
+        }
+        val jvmSharedMain by creating {
+            dependsOn(jvmCommonMain)
+            kotlin.srcDir(generateTelegramSecrets)
+            kotlin.srcDir(generateScrobblerSecrets)
+            kotlin.srcDir(generateAppInfo)
+            dependencies {
+                implementation(libs.ktor.client.okhttp)
+                implementation(libs.okhttp.tls)
+                implementation(libs.okhttp.dnsoverhttps)
+                // Coil network fetcher backed by the app OkHttp client (DoH + CloudFlare cookies + source headers)
+                // so protected-source covers/pages/thumbnails load like the parser does.
+                implementation(libs.coil.network)
+                implementation(nekuvaExts) {
+                    exclude(group = "org.json", module = "json")
+                }
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+                // org.json for MangaIndex (download index.json). compileOnly: Android bundles it in the
+                // platform; Desktop provides it via desktopMain's implementation(libs.json) at runtime.
+                compileOnly(libs.json)
+            }
+        }
+        val iosSharedMain by creating {
+            dependsOn(commonMain)
+            kotlin.srcDir("src/iosSharedMain/kotlin")
+            kotlin.srcDir(syncIosSharedSources)
+            kotlin.srcDir(generateTelegramSecrets)
+            kotlin.srcDir(generateScrobblerSecrets)
+            kotlin.srcDir(generateAppInfo)
+            dependencies {
+                implementation(nekuvaExts)
+            }
+        }
+        val iosMain by creating {
+            dependsOn(iosSharedMain)
+        }
+        val iosArm64Main by getting {
+            dependsOn(iosMain)
+        }
+        val iosSimulatorArm64Main by getting {
+            dependsOn(iosMain)
         }
         val commonTest by getting {
             dependencies {
@@ -240,6 +388,22 @@ kotlin {
 dependencies {
     add("kspAndroid", libs.androidx.room.compiler)
     add("kspDesktop", libs.androidx.room.compiler)
+    add("kspIosArm64", libs.androidx.room.compiler)
+    add("kspIosSimulatorArm64", libs.androidx.room.compiler)
+}
+
+tasks.matching {
+    it.name == "compileKotlinIosArm64" ||
+        it.name == "compileKotlinIosSimulatorArm64" ||
+        it.name == "kspKotlinIosArm64" ||
+        it.name == "kspKotlinIosSimulatorArm64" ||
+        it.name == "compileIosMainKotlinMetadata" ||
+        it.name == "compileIosSharedMainKotlinMetadata"
+}.configureEach {
+    dependsOn(syncIosSharedSources)
+    dependsOn(generateTelegramSecrets)
+    dependsOn(generateScrobblerSecrets)
+    dependsOn(generateAppInfo)
 }
 
 android {

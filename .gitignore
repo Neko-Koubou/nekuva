@@ -35,3 +35,4 @@ core_*
 /captures
 # GEMINI.md
 MIGRATION.md
+.codegraph/

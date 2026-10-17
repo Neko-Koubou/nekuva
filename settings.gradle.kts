@@ -19,6 +19,7 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        mavenLocal()
         google()
         mavenCentral()
         maven(url = "https://jitpack.io")
@@ -27,11 +28,11 @@ dependencyResolutionManagement {
     }
 }
 
-// includeBuild("../nekuva-exts") { // Sesuaikan path relatif ini menuju folder nekuva-exts buat local testing sebelum publish ke JitPack
-//     dependencySubstitution {
-//         substitute(module("com.github.Neko-Koubou:nekuva-exts")).using(project(":"))
-//     }
-// }
+includeBuild("../nekuva-exts") { // Sesuaikan path relatif ini menuju folder nekuva-exts buat local testing sebelum publish ke JitPack
+    dependencySubstitution {
+        substitute(module("com.github.Neko-Koubou:nekuva-exts")).using(project(":"))
+    }
+}
 
 include(":composeApp")
 rootProject.name = "Nekuva"
