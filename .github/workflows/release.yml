@@ -48,15 +48,17 @@ jobs:
           cat > release_notes.md <<'INTRO'
 
           Nekuva is a Kotlin Multiplatform manga reader (Kotatsu/Doki lineage), rewritten in Compose
-          Multiplatform and now running on **Android, Windows, Linux, and macOS**.
+          Multiplatform and now running on **Android, iOS, Windows, Linux, and macOS**.
 
           ## Downloads
           - **Android** — `…-android-universal.apk` if unsure, or match your CPU (`arm64-v8a` for most phones).
+          - **iOS** — `…-ios-unsigned.ipa` (Sideloading: AltStore, SideStore, TrollStore, Scarlet, Sideloadly)
           - **Windows** — `…-windows-x64.msi` or `…-windows-arm64.msi`
           - **Linux** — `…-linux-amd64.deb` or `…-linux-arm64.deb` (also AppImage)
           - **macOS** — `…-macos-x64.dmg` or `…-macos-apple-silicon.dmg`
 
           ## Notes
+          - **iOS:** The `.ipa` is unsigned / no developer certificate required. To install on iOS/iPadOS, use a **Sideloading** method (such as AltStore, SideStore, TrollStore, Scarlet, or Sideloadly) with your own Apple ID.
           - **macOS:** the `.dmg` is unsigned / un-notarized → right-click the app and choose **Open** to bypass Gatekeeper.
           - This is a **stable** release — expect a polished experience; please report any bugs you find.
           INTRO
@@ -477,3 +479,71 @@ jobs:
           make_latest: true
           fail_on_unmatched_files: true
           files: dist/*.dmg
+
+  ios:
+    name: iOS IPA (unsigned)
+    needs: create-release
+    runs-on: macos-14
+    steps:
+      - name: Checkout Nekuva
+        uses: actions/checkout@v4
+        with:
+          path: nekuva
+
+      - name: Checkout Nekuva Extensions
+        uses: actions/checkout@v4
+        with:
+          repository: Neko-Koubou/nekuva-exts
+          path: nekuva-exts
+          ref: feat/ios-migration
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build Unsigned iOS App
+        shell: bash
+        env:
+          GRADLE_OPTS: "-Xmx6144m -Dkotlin.daemon.jvm.options=-Xmx6144m"
+          TG_BACKUP_BOT_TOKEN: ${{ secrets.TG_BACKUP_BOT_TOKEN }}
+          ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
+          ANILIST_CLIENT_SECRET: ${{ secrets.ANILIST_CLIENT_SECRET }}
+          MAL_CLIENT_ID: ${{ secrets.MAL_CLIENT_ID }}
+        run: |
+          cd nekuva
+          chmod +x gradlew
+          VERSION="${GITHUB_REF_NAME#v}"
+          xcodebuild -project iosApp/iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            -derivedDataPath build/ios \
+            build
+
+      - name: Package IPA
+        shell: bash
+        run: |
+          cd nekuva
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist Payload
+          cp -r build/ios/Build/Products/Release-iphoneos/Nekuva.app Payload/
+          zip -r -y "dist/Nekuva-${VERSION}-ios-unsigned.ipa" Payload
+          rm -rf Payload
+          ls -la dist
+
+      - name: Upload iOS Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Nekuva ${{ github.ref_name }}
+          prerelease: false
+          make_latest: true
+          fail_on_unmatched_files: true
+          files: nekuva/dist/*.ipa
+

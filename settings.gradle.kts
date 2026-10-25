@@ -28,9 +28,12 @@ dependencyResolutionManagement {
     }
 }
 
-includeBuild("../nekuva-exts") { // Sesuaikan path relatif ini menuju folder nekuva-exts buat local testing sebelum publish ke JitPack
-    dependencySubstitution {
-        substitute(module("com.github.Neko-Koubou:nekuva-exts")).using(project(":"))
+val extsDir = file("../nekuva-exts")
+if (extsDir.exists() && file("../nekuva-exts/build.gradle.kts").exists()) {
+    includeBuild(extsDir) {
+        dependencySubstitution {
+            substitute(module("com.github.Neko-Koubou:nekuva-exts")).using(project(":"))
+        }
     }
 }
 

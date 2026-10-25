@@ -243,6 +243,7 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "ComposeApp"
             isStatic = true
+            binaryOption("bundleId", "org.nekosukuriputo.nekuva.ComposeApp")
         }
         iosTarget.compilations.all {
             compileTaskProvider.configure {

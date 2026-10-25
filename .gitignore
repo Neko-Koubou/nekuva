@@ -12,7 +12,9 @@ keystore/
 
 # Build folders
 build/
+bin/
 composeApp/build/
+composeApp/bin/
 iosApp/build/
 iosApp/Pods/
 iosApp/*.xcworkspace/xcuserdata/
