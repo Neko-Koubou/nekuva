@@ -28,14 +28,14 @@ dependencyResolutionManagement {
     }
 }
 
-// val extsDir = file("../nekuva-exts")
-// if (extsDir.exists() && file("../nekuva-exts/build.gradle.kts").exists()) {
-//     includeBuild(extsDir) {
-//         dependencySubstitution {
-//             substitute(module("com.github.Neko-Koubou:nekuva-exts")).using(project(":"))
-//         }
-//     }
-// }
+val extsDir = file("../nekuva-exts")
+if (extsDir.exists() && file("../nekuva-exts/build.gradle.kts").exists()) {
+    includeBuild(extsDir) {
+        dependencySubstitution {
+            substitute(module("com.github.Neko-Koubou:nekuva-exts")).using(project(":"))
+        }
+    }
+}
 
 include(":composeApp")
 rootProject.name = "Nekuva"

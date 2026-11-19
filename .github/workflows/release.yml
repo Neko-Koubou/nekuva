@@ -278,7 +278,7 @@ jobs:
   macos:
     name: macOS installer (.dmg)
     needs: create-release
-    runs-on: macos-14
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -483,19 +483,27 @@ jobs:
   ios:
     name: iOS IPA (unsigned)
     needs: create-release
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout Nekuva
         uses: actions/checkout@v4
         with:
           path: nekuva
 
+      - name: Resolve nekuva-exts version
+        id: exts
+        shell: bash
+        run: |
+          VER=$(grep -E 'val defaultExtsVersion[[:space:]]*=' nekuva/composeApp/build.gradle.kts | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "ref=${VER:-main}" >> "$GITHUB_OUTPUT"
+          echo "Resolved nekuva-exts ref: ${VER:-main}"
+
       - name: Checkout Nekuva Extensions
         uses: actions/checkout@v4
         with:
           repository: Neko-Koubou/nekuva-exts
           path: nekuva-exts
-          ref: feat/ios-migration
+          ref: ${{ steps.exts.outputs.ref }}
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -515,11 +523,15 @@ jobs:
           cd nekuva
           chmod +x gradlew
           VERSION="${GITHUB_REF_NAME#v}"
+          NUMERIC="${VERSION%%-*}"
+          ORG_GRADLE_PROJECT_appVersionName="$VERSION" \
           xcodebuild -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
+            MARKETING_VERSION="$NUMERIC" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
