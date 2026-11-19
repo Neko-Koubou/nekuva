@@ -236,6 +236,8 @@ kotlin {
         }
     }
 
+    val iosCiFastLink = (findProperty("iosCiFastLink") as String?)?.toBoolean() == true
+
     listOf(
         iosArm64(),
         iosSimulatorArm64(),
@@ -244,6 +246,13 @@ kotlin {
             baseName = "ComposeApp"
             isStatic = true
             binaryOption("bundleId", "org.nekosukuriputo.nekuva.ComposeApp")
+            if (iosCiFastLink && buildType == org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType.RELEASE) {
+                freeCompilerArgs += listOf(
+                    "-Xadd-light-debug=disable",
+                    "-Xllvm-module-passes=default<O1>",
+                    "-Xdisable-phases=BuildDFG,DevirtualizationAnalysis,PreCodegenInliner,DCEPhase,Devirtualization,EscapeAnalysis,RemoveRedundantCallsToStaticInitializersPhase,LTOBitcodeOptimization",
+                )
+            }
         }
         iosTarget.compilations.all {
             compileTaskProvider.configure {

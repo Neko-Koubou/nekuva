@@ -511,10 +511,49 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Cache Gradle & Kotlin/Native
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.konan
+          key: ${{ runner.os }}-ios-${{ hashFiles('nekuva/**/*.gradle.kts', 'nekuva/gradle/libs.versions.toml', 'nekuva/gradle.properties', 'nekuva-exts/**/*.gradle.kts') }}
+          restore-keys: |
+            ${{ runner.os }}-ios-
+
+      - name: Configure low-memory Gradle for 7 GB macOS runner
+        shell: bash
+        run: |
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/gradle.properties <<'PROPS'
+          org.gradle.daemon=false
+          org.gradle.jvmargs=-Xmx2g -XX:+UseG1GC
+          kotlin.daemon.jvmargs=-Xmx2g
+          kotlin.native.jvmArgs=-Xmx4g -XX:+UseG1GC
+          org.gradle.workers.max=2
+          PROPS
+
+      - name: Compile & Link iOS Release Framework
+        shell: bash
+        env:
+          ORG_GRADLE_PROJECT_iosCiFastLink: "true"
+          TG_BACKUP_BOT_TOKEN: ${{ secrets.TG_BACKUP_BOT_TOKEN }}
+          ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
+          ANILIST_CLIENT_SECRET: ${{ secrets.ANILIST_CLIENT_SECRET }}
+          MAL_CLIENT_ID: ${{ secrets.MAL_CLIENT_ID }}
+        run: |
+          cd nekuva
+          chmod +x gradlew
+          VERSION="${GITHUB_REF_NAME#v}"
+          export ORG_GRADLE_PROJECT_appVersionName="$VERSION"
+          ./gradlew :composeApp:compileKotlinIosArm64 --no-daemon --console=plain
+          ./gradlew :composeApp:linkReleaseFrameworkIosArm64 --no-daemon --console=plain -Dorg.gradle.jvmargs="-Xmx1536m -XX:+UseG1GC"
+
       - name: Build Unsigned iOS App
         shell: bash
         env:
-          GRADLE_OPTS: "-Xmx6144m -Dkotlin.daemon.jvm.options=-Xmx6144m"
+          ORG_GRADLE_PROJECT_iosCiFastLink: "true"
           TG_BACKUP_BOT_TOKEN: ${{ secrets.TG_BACKUP_BOT_TOKEN }}
           ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
           ANILIST_CLIENT_SECRET: ${{ secrets.ANILIST_CLIENT_SECRET }}
@@ -532,6 +571,8 @@ jobs:
             -destination 'generic/platform=iOS' \
             MARKETING_VERSION="$NUMERIC" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            DEBUG_INFORMATION_FORMAT=dwarf \
+            DWARF_DSYM_FILE_SHOULD_ACCOMPANY_PRODUCT=NO \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
