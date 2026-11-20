@@ -530,7 +530,7 @@ jobs:
           org.gradle.daemon=false
           org.gradle.jvmargs=-Xmx2g -XX:+UseG1GC
           kotlin.daemon.jvmargs=-Xmx2g
-          kotlin.native.jvmArgs=-Xmx4g -XX:+UseG1GC
+          kotlin.native.jvmArgs=-Xmx5g -XX:+UseG1GC -XX:+UseStringDeduplication
           org.gradle.workers.max=2
           PROPS
 
@@ -547,8 +547,13 @@ jobs:
           chmod +x gradlew
           VERSION="${GITHUB_REF_NAME#v}"
           export ORG_GRADLE_PROJECT_appVersionName="$VERSION"
+          TOTAL_MB=$(( $(sysctl -n hw.memsize) / 1024 / 1024 ))
+          echo "Runner RAM: ${TOTAL_MB} MB"
+          if [ "$TOTAL_MB" -ge 12000 ]; then LINK_XMX="8g"; else LINK_XMX="5g"; fi
           ./gradlew :composeApp:compileKotlinIosArm64 --no-daemon --console=plain
-          ./gradlew :composeApp:linkReleaseFrameworkIosArm64 --no-daemon --console=plain -Dorg.gradle.jvmargs="-Xmx1536m -XX:+UseG1GC"
+          echo "Linking Release framework with in-process heap -Xmx${LINK_XMX}"
+          ./gradlew :composeApp:linkReleaseFrameworkIosArm64 --no-daemon --console=plain \
+            -Dorg.gradle.jvmargs="-Xmx${LINK_XMX} -XX:+UseG1GC -XX:+UseStringDeduplication"
 
       - name: Build Unsigned iOS App
         shell: bash
