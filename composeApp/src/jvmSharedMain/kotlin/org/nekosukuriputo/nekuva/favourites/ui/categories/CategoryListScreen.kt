@@ -1,8 +1,10 @@
 package org.nekosukuriputo.nekuva.favourites.ui.categories
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -76,7 +78,27 @@ fun CategoryListScreen(
             
             itemsIndexed(categories, key = { _, it -> it.id }) { index, category ->
                 ListItem(
-                    headlineContent = { Text(category.title) },
+                    headlineContent = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(category.title)
+                            if (category.isNsfw) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                ) {
+                                    Text(
+                                        text = stringResource(Res.string.nsfw),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                    )
+                                }
+                            }
+                        }
+                    },
                     trailingContent = {
                         Row {
                             if (index > 0) {
@@ -135,15 +157,18 @@ fun CategoryListScreen(
         }
 
         if (showDialog) {
+            val target = editingCategory
             CategoryDialog(
-                initialName = editingCategory?.title ?: "",
+                initialName = target?.title ?: "",
+                initialIsNsfw = target?.isNsfw ?: false,
+                isEditing = target != null,
                 onDismiss = { showDialog = false },
-                onConfirm = { name ->
+                onConfirm = { name, isNsfw ->
                     showDialog = false
-                    if (editingCategory == null) {
-                        viewModel.createCategory(name)
+                    if (target == null) {
+                        viewModel.createCategory(name, isNsfw)
                     } else {
-                        viewModel.updateCategory(editingCategory!!, name)
+                        viewModel.updateCategory(target, name, isNsfw)
                     }
                 }
             )
@@ -154,25 +179,55 @@ fun CategoryListScreen(
 @Composable
 fun CategoryDialog(
     initialName: String,
+    initialIsNsfw: Boolean = false,
+    isEditing: Boolean = initialName.isNotEmpty(),
     onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
+    onConfirm: (String, Boolean) -> Unit
 ) {
-    var name by remember { mutableStateOf(initialName) }
+    var name by remember(initialName, initialIsNsfw) { mutableStateOf(initialName) }
+    var isNsfw by remember(initialName, initialIsNsfw) { mutableStateOf(initialIsNsfw) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(if (initialName.isEmpty()) Res.string.create_category else Res.string.rename)) },
+        title = { Text(stringResource(if (!isEditing) Res.string.create_category else Res.string.edit_category)) },
         text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text(stringResource(Res.string.enter_name)) },
-                singleLine = true
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(Res.string.enter_name)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isNsfw = !isNsfw }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            text = stringResource(Res.string.category_nsfw),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            text = stringResource(Res.string.category_nsfw_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = isNsfw,
+                        onCheckedChange = { isNsfw = it },
+                    )
+                }
+            }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(name) },
+                onClick = { onConfirm(name, isNsfw) },
                 enabled = name.isNotBlank()
             ) {
                 Text(stringResource(Res.string.save))

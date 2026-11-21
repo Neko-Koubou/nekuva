@@ -93,7 +93,7 @@ fun FavouriteCategoryEntity.toSyncDto() = FavouriteCategorySyncDto(
 	deletedAt = deletedAt,
 )
 
-fun FavouriteCategorySyncDto.toEntity() = FavouriteCategoryEntity(
+fun FavouriteCategorySyncDto.toEntity(isNsfw: Boolean = false) = FavouriteCategoryEntity(
 	categoryId = categoryId,
 	createdAt = createdAt,
 	sortKey = sortKey,
@@ -102,6 +102,7 @@ fun FavouriteCategorySyncDto.toEntity() = FavouriteCategoryEntity(
 	track = track,
 	isVisibleInLibrary = isVisibleInLibrary,
 	deletedAt = deletedAt,
+	isNsfw = isNsfw,
 )
 
 fun HistoryEntity.toSyncDto(manga: MangaSyncDto) = HistorySyncDto(

@@ -934,4 +934,6 @@
     <string name="shikimori">Shikimori</string>
     <string name="source_icons">Ikon sumber</string>
     <string name="set_as_cover">Jadikan sampul</string>
+    <string name="category_nsfw">Kategori TAUSB / NSFW (18+)</string>
+    <string name="category_nsfw_summary">Sembunyikan tab ini saat Nonaktifkan TAUSB aktif</string>
 </resources>

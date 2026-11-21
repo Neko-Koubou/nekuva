@@ -10,4 +10,5 @@ data class FavouriteCategory(
     val createdAt: Long,
     val isTrackingEnabled: Boolean,
     val isVisibleInLibrary: Boolean,
+    val isNsfw: Boolean = false,
 )

@@ -1,6 +1,7 @@
 package org.nekosukuriputo.nekuva.core.db.entity
 
 import org.nekosukuriputo.nekuva.core.model.MangaSource
+import org.nekosukuriputo.nekuva.core.model.isNsfw
 import org.nekosukuriputo.nekuva.parsers.model.ContentRating
 import org.nekosukuriputo.nekuva.parsers.model.Manga
 import org.nekosukuriputo.nekuva.parsers.model.MangaChapter
@@ -74,7 +75,7 @@ fun Manga.toEntity() = MangaEntity(
 	coverUrl = coverUrl.orEmpty(),
 	altTitles = altTitles.joinToString(VALUES_DIVIDER.toString()),
 	rating = rating,
-	isNsfw = isNsfw,
+	isNsfw = this.isNsfw(),
 	contentRating = contentRating?.name,
 	state = state?.name,
 	title = title,

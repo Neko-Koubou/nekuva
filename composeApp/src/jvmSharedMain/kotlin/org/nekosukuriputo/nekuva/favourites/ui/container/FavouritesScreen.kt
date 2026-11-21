@@ -1,28 +1,38 @@
 package org.nekosukuriputo.nekuva.favourites.ui.container
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,15 +45,23 @@ import org.nekosukuriputo.nekuva.favourites.ui.list.FavouritesListScreen
 import nekuva.composeapp.generated.resources.Res
 import nekuva.composeapp.generated.resources.all_favourites
 import nekuva.composeapp.generated.resources.cancel
+import nekuva.composeapp.generated.resources.category_nsfw
+import nekuva.composeapp.generated.resources.category_nsfw_summary
 import nekuva.composeapp.generated.resources.delete
 import nekuva.composeapp.generated.resources.edit_category
 import nekuva.composeapp.generated.resources.hide
 import nekuva.composeapp.generated.resources.manage
 import nekuva.composeapp.generated.resources.name
+import nekuva.composeapp.generated.resources.nsfw
 import nekuva.composeapp.generated.resources.save
 
 /** One tab descriptor: [id] = -1 for "All favourites", else a real category. */
-private data class FavTab(val id: Long, val title: String, val isAll: Boolean)
+private data class FavTab(
+    val id: Long,
+    val title: String,
+    val isAll: Boolean,
+    val isNsfw: Boolean = false,
+)
 
 /**
  * Favourites container (Doki FavouritesContainerFragment): "All favourites" tab (when visible) + a tab per
@@ -63,7 +81,7 @@ fun FavouritesScreen(
     val allLabel = stringResource(Res.string.all_favourites)
     val tabs = buildList {
         if (isAllFavouritesVisible) add(FavTab(FavouritesViewModel.ALL_CATEGORY_ID, allLabel, isAll = true))
-        categories.forEach { add(FavTab(it.id, it.title, isAll = false)) }
+        categories.forEach { add(FavTab(it.id, it.title, isAll = false, isNsfw = it.isNsfw)) }
     }
     if (tabs.isEmpty()) {
         // No visible categories and "All" hidden — show the empty all-favourites list as a fallback.
@@ -72,6 +90,11 @@ fun FavouritesScreen(
     }
 
     val pagerState = rememberPagerState(pageCount = { tabs.size })
+    LaunchedEffect(tabs.size) {
+        if (pagerState.currentPage >= tabs.size) {
+            pagerState.scrollToPage(tabs.lastIndex)
+        }
+    }
     val coroutineScope = rememberCoroutineScope()
     var menuForTab by remember { mutableStateOf<FavTab?>(null) }
     var renameTab by remember { mutableStateOf<FavTab?>(null) }
@@ -107,7 +130,27 @@ fun FavouritesScreen(
                                 if (isLongPress) menuForTab = tab
                             }
                         },
-                        text = { Text(tab.title) },
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Text(tab.title)
+                                if (tab.isNsfw) {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                    ) {
+                                        Text(
+                                            text = stringResource(Res.string.nsfw),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                        )
+                                    }
+                                }
+                            }
+                        },
                     )
                     FavTabMenu(
                         tab = if (menuForTab?.id == tab.id) tab else null,
@@ -121,37 +164,79 @@ fun FavouritesScreen(
             }
         }
 
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-            FavouritesListScreen(categoryId = tabs[page].id, onMangaClick = onMangaClick)
+        HorizontalPager(
+            state = pagerState,
+            key = { page -> tabs.getOrNull(page)?.id ?: page },
+            modifier = Modifier.fillMaxSize(),
+        ) { page ->
+            val tab = tabs.getOrNull(page) ?: return@HorizontalPager
+            FavouritesListScreen(categoryId = tab.id, onMangaClick = onMangaClick)
         }
     }
 
     renameTab?.let { tab ->
-        RenameCategoryDialog(
+        EditCategoryDialog(
             currentTitle = tab.title,
+            currentIsNsfw = tab.isNsfw,
             onDismiss = { renameTab = null },
-            onConfirm = { newTitle -> viewModel.renameCategory(tab.id, newTitle); renameTab = null },
+            onConfirm = { newTitle, newIsNsfw ->
+                viewModel.updateCategory(tab.id, newTitle, newIsNsfw)
+                renameTab = null
+            },
         )
     }
 }
 
 @Composable
-private fun RenameCategoryDialog(currentTitle: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-    var text by remember { mutableStateOf(currentTitle) }
+private fun EditCategoryDialog(
+    currentTitle: String,
+    currentIsNsfw: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String, Boolean) -> Unit,
+) {
+    var text by remember(currentTitle, currentIsNsfw) { mutableStateOf(currentTitle) }
+    var isNsfw by remember(currentTitle, currentIsNsfw) { mutableStateOf(currentIsNsfw) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(Res.string.edit_category)) },
         text = {
-            androidx.compose.material3.OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                singleLine = true,
-                label = { Text(stringResource(Res.string.name)) },
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                androidx.compose.material3.OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    singleLine = true,
+                    label = { Text(stringResource(Res.string.name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isNsfw = !isNsfw }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            text = stringResource(Res.string.category_nsfw),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            text = stringResource(Res.string.category_nsfw_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = isNsfw,
+                        onCheckedChange = { isNsfw = it },
+                    )
+                }
+            }
         },
         confirmButton = {
             androidx.compose.material3.TextButton(
-                onClick = { onConfirm(text) },
+                onClick = { onConfirm(text, isNsfw) },
                 enabled = text.isNotBlank(),
             ) { Text(stringResource(Res.string.save)) }
         },

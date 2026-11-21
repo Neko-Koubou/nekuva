@@ -39,13 +39,19 @@ abstract class FavouriteCategoriesDao {
 	 */
 	// track = 1: the Default category watches new chapters by default (consistent with user-created
 	// categories, which default to tracking ON), so "Favorite this" → Default actually populates the Feed.
-	@Query("INSERT OR IGNORE INTO favourite_categories (category_id, created_at, sort_key, title, `order`, track, show_in_lib, deleted_at) VALUES (0, :createdAt, 0, :title, :order, 1, 1, 0)")
+	@Query("INSERT OR IGNORE INTO favourite_categories (category_id, created_at, sort_key, title, `order`, track, show_in_lib, deleted_at, nsfw) VALUES (0, :createdAt, 0, :title, :order, 1, 1, 0, 0)")
 	abstract suspend fun ensureDefaultCategory(createdAt: Long, title: String, order: String)
 
 	suspend fun delete(id: Long) = setDeletedAt(id, System.currentTimeMillis())
 
-	@Query("UPDATE favourite_categories SET title = :title, `order` = :order, `track` = :tracker, `show_in_lib` = :onShelf WHERE category_id = :id")
-	abstract suspend fun update(id: Long, title: String, order: String, tracker: Boolean, onShelf: Boolean)
+	@Query("UPDATE favourite_categories SET title = :title, `order` = :order, `track` = :tracker, `show_in_lib` = :onShelf, `nsfw` = :isNsfw WHERE category_id = :id")
+	abstract suspend fun update(id: Long, title: String, order: String, tracker: Boolean, onShelf: Boolean, isNsfw: Boolean)
+
+	@Query("UPDATE favourite_categories SET title = :title, `nsfw` = :isNsfw WHERE category_id = :id")
+	abstract suspend fun updateTitleAndNsfw(id: Long, title: String, isNsfw: Boolean)
+
+	@Query("UPDATE favourite_categories SET `nsfw` = :isNsfw WHERE category_id = :id")
+	abstract suspend fun updateNsfw(id: Long, isNsfw: Boolean)
 
 	@Query("UPDATE favourite_categories SET title = :title WHERE category_id = :id")
 	abstract suspend fun updateTitle(id: Long, title: String)

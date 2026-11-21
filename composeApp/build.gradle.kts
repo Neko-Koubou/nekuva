@@ -97,7 +97,7 @@ val generateScrobblerSecrets by tasks.registering {
 // desktopPackageVersion is the INSTALLER version: jpackage/MSI/DMG require MAJOR.MINOR.PATCH with
 // MAJOR > 0 (so "-beta" / leading-zero majors are rejected). It's just for upgrade ordering – the
 // user-facing version is appVersion (AppInfo / About / release tag).
-val defaultVersion = "2.0.0"
+val defaultVersion = "2.1.0"
 val defaultExtsVersion = "v1.0.25"
 val nekuvaExts = "com.github.Neko-Koubou:nekuva-exts:$defaultExtsVersion"
 val appCodename = "Teo" // Change this per major update!

@@ -2,9 +2,11 @@ package org.nekosukuriputo.nekuva.favourites.domain
 
 import org.nekosukuriputo.nekuva.core.db.withTransactionKmp
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import org.nekosukuriputo.nekuva.core.db.MangaDatabase
 import org.nekosukuriputo.nekuva.core.db.TABLE_FAVOURITES
@@ -26,12 +28,16 @@ import kotlin.time.Clock
 class FavouritesRepository(
 	private val db: MangaDatabase,
 	private val mangaDataRepository: org.nekosukuriputo.nekuva.core.parser.MangaDataRepository,
+	private val settings: org.nekosukuriputo.nekuva.core.prefs.AppSettings,
 ) {
 
+	private fun observeIsNsfwDisabled(): Flow<Boolean> =
+		settings.observeIsNsfwDisabled().distinctUntilChanged()
+
 	fun observeAll(order: ListSortOrder, filterOptions: Set<ListFilterOption>, limit: Int): Flow<List<Manga>> {
-		return db.getFavouritesDao().observeAll(order, filterOptions, limit)
-			// Apply user overrides (custom title/cover) for display (Doki MangaListMapper.getOverrides()).
-			.map { mangaDataRepository.applyOverrides(it.toMangaList()) }
+		return observeIsNsfwDisabled().flatMapLatest { skipNsfw ->
+			db.getFavouritesDao().observeAll(order, filterOptions, limit, excludeNsfwCategories = skipNsfw)
+		}.map { mangaDataRepository.applyOverrides(it.toMangaList()) }
 	}
 
 	fun observeAll(
@@ -40,8 +46,22 @@ class FavouritesRepository(
 		filterOptions: Set<ListFilterOption>,
 		limit: Int
 	): Flow<List<Manga>> {
-		return db.getFavouritesDao().observeAll(categoryId, order, filterOptions, limit)
-			.map { mangaDataRepository.applyOverrides(it.toMangaList()) }
+		if (categoryId == DEFAULT_CATEGORY_ID) {
+			return observeAll(order, filterOptions, limit)
+		}
+		return combine(
+			observeIsNsfwDisabled(),
+			db.getFavouriteCategoriesDao().observe(categoryId),
+		) { skipNsfw, category -> skipNsfw && category?.isNsfw == true }
+			.distinctUntilChanged()
+			.flatMapLatest { hidden ->
+				if (hidden) {
+					flowOf(emptyList())
+				} else {
+					db.getFavouritesDao().observeAll(categoryId, order, filterOptions, limit)
+						.map { mangaDataRepository.applyOverrides(it.toMangaList()) }
+				}
+			}
 	}
 
 	fun observeAll(categoryId: Long, filterOptions: Set<ListFilterOption>, limit: Int): Flow<List<Manga>> {
@@ -55,20 +75,35 @@ class FavouritesRepository(
 	}
 
 	fun observeCategories(): Flow<List<FavouriteCategory>> {
-		return db.getFavouriteCategoriesDao().observeAll().map { list ->
-			list.map { it.toFavouriteCategory() }
+		return combine(
+			db.getFavouriteCategoriesDao().observeAll(),
+			observeIsNsfwDisabled(),
+		) { list, skipNsfw ->
+			list.mapNotNull { entity ->
+				if (skipNsfw && entity.isNsfw) null else entity.toFavouriteCategory()
+			}
 		}
 	}
 
 	fun observeCategoriesForLibrary(): Flow<List<FavouriteCategory>> {
-		return db.getFavouriteCategoriesDao().observeAllVisible().map { list ->
-			list.map { it.toFavouriteCategory() }
+		return combine(
+			db.getFavouriteCategoriesDao().observeAllVisible(),
+			observeIsNsfwDisabled(),
+		) { list, skipNsfw ->
+			list.mapNotNull { entity ->
+				if (skipNsfw && entity.isNsfw) null else entity.toFavouriteCategory()
+			}
 		}
 	}
 
 	/** Favourite categories with the most updated manga — the Feed quick-filter chips (Doki UpdatesListQuickFilter). */
-	suspend fun getMostUpdatedCategories(limit: Int): List<FavouriteCategory> =
-		db.getFavouriteCategoriesDao().getMostUpdatedCategories(limit).map { it.toFavouriteCategory() }
+	suspend fun getMostUpdatedCategories(limit: Int): List<FavouriteCategory> {
+		val skipNsfw = settings.isNsfwContentDisabled
+		val raw = db.getFavouriteCategoriesDao().getMostUpdatedCategories(if (skipNsfw) limit * 4 else limit)
+		return raw.mapNotNull { entity ->
+			if (skipNsfw && entity.isNsfw) null else entity.toFavouriteCategory()
+		}.take(limit)
+	}
 
 	fun observeCategory(id: Long): Flow<FavouriteCategory?> {
 		return db.getFavouriteCategoriesDao().observe(id)
@@ -107,10 +142,11 @@ class FavouritesRepository(
 	): List<Manga> {
 		val q = "%$query%"
 		val dao = db.getFavouritesDao()
+		val skipNsfw = settings.isNsfwContentDisabled
 		return when (kind) {
-			org.nekosukuriputo.nekuva.search.domain.SearchKind.AUTHOR -> dao.searchByAuthor(q, limit)
-			org.nekosukuriputo.nekuva.search.domain.SearchKind.TAG -> dao.searchByTag(q, limit)
-			else -> dao.searchByTitle(q, limit)
+			org.nekosukuriputo.nekuva.search.domain.SearchKind.AUTHOR -> dao.searchByAuthor(q, limit, skipNsfw)
+			org.nekosukuriputo.nekuva.search.domain.SearchKind.TAG -> dao.searchByTag(q, limit, skipNsfw)
+			else -> dao.searchByTitle(q, limit, skipNsfw)
 		}.toMangaListWithTags()
 	}
 
@@ -123,6 +159,7 @@ class FavouritesRepository(
 		sortOrder: ListSortOrder,
 		isTrackerEnabled: Boolean,
 		isVisibleOnShelf: Boolean,
+		isNsfw: Boolean = false,
 	): FavouriteCategory {
 		val entity = FavouriteCategoryEntity(
 			title = title,
@@ -133,6 +170,7 @@ class FavouritesRepository(
 			track = isTrackerEnabled,
 			deletedAt = 0L,
 			isVisibleInLibrary = isVisibleOnShelf,
+			isNsfw = isNsfw,
 		)
 		val id = db.getFavouriteCategoriesDao().insert(entity)
 		return entity.toFavouriteCategory(id)
@@ -144,8 +182,21 @@ class FavouritesRepository(
 		sortOrder: ListSortOrder,
 		isTrackerEnabled: Boolean,
 		isVisibleOnShelf: Boolean,
+		isNsfw: Boolean = false,
 	) {
-		db.getFavouriteCategoriesDao().update(id, title, sortOrder.name, isTrackerEnabled, isVisibleOnShelf)
+		db.getFavouriteCategoriesDao().update(id, title, sortOrder.name, isTrackerEnabled, isVisibleOnShelf, isNsfw)
+	}
+
+	suspend fun updateCategoryTitleAndNsfw(id: Long, title: String, isNsfw: Boolean) {
+		db.getFavouriteCategoriesDao().updateTitleAndNsfw(id, title, isNsfw)
+	}
+
+	suspend fun setCategoryNsfw(id: Long, isNsfw: Boolean) {
+		db.getFavouriteCategoriesDao().updateNsfw(id, isNsfw)
+	}
+
+	suspend fun setCategoryTracking(id: Long, isEnabled: Boolean) {
+		db.getFavouriteCategoriesDao().updateTracking(id, isEnabled)
 	}
 
 	/** Toggle a category's "show in library" flag without touching its other fields (Doki tab Hide). */

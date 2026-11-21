@@ -190,6 +190,9 @@ class AppSettings(private val prefs: ObservableSettings) {
 		get() = prefs.getBoolean(KEY_DISABLE_NSFW, false)
 		set(value) = prefs.putBoolean(KEY_DISABLE_NSFW, value)
 
+	fun observeIsNsfwDisabled(): kotlinx.coroutines.flow.Flow<Boolean> =
+		observeBoolean(KEY_DISABLE_NSFW, false)
+
 	var appLocales: String
 		get() {
 			val raw = prefs.getStringOrNull(KEY_APP_LOCALE)

@@ -13,7 +13,7 @@ class DatabasePrePopulateCallback : RoomDatabase.Callback() {
 		// to "Default" satisfy the category_id foreign key. Explicit id 0 (not @Insert) because Room's
 		// autoGenerate PK would otherwise reassign it. It is hidden from the category list queries.
 		connection.prepare(
-			"INSERT OR IGNORE INTO favourite_categories (category_id, created_at, sort_key, title, `order`, track, show_in_lib, `deleted_at`) VALUES (0,?,0,?,?,0,1,0)"
+			"INSERT OR IGNORE INTO favourite_categories (category_id, created_at, sort_key, title, `order`, track, show_in_lib, `deleted_at`, nsfw) VALUES (0,?,0,?,?,0,1,0,0)"
 		).use { stmt ->
 			stmt.bindLong(1, System.currentTimeMillis())
 			stmt.bindText(2, "Default")
@@ -21,7 +21,7 @@ class DatabasePrePopulateCallback : RoomDatabase.Callback() {
 			stmt.step()
 		}
 		connection.prepare(
-			"INSERT INTO favourite_categories (created_at, sort_key, title, `order`, track, show_in_lib, `deleted_at`) VALUES (?,?,?,?,?,?,?)"
+			"INSERT INTO favourite_categories (created_at, sort_key, title, `order`, track, show_in_lib, `deleted_at`, nsfw) VALUES (?,?,?,?,?,?,?,?)"
 		).use { stmt ->
 			stmt.bindLong(1, System.currentTimeMillis())
 			stmt.bindLong(2, 1L)
@@ -30,6 +30,7 @@ class DatabasePrePopulateCallback : RoomDatabase.Callback() {
 			stmt.bindLong(5, 1L)
 			stmt.bindLong(6, 1L)
 			stmt.bindLong(7, 0L)
+			stmt.bindLong(8, 0L)
 			stmt.step()
 		}
 	}

@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -47,22 +48,30 @@ class FeedViewModel(
     val appliedFilter: StateFlow<Set<ListFilterOption>> = _appliedFilter.asStateFlow()
 
     /** Available quick-filter chips (Doki UpdatesListQuickFilter): top favourite categories by updates. */
-    val quickFilterOptions: StateFlow<List<ListFilterOption>> = flow {
-        emit(
-            if (settings.isQuickFilterEnabled) {
-                runCatchingCancellable {
-                    favouritesRepository.getMostUpdatedCategories(limit = 4).map { ListFilterOption.Favorite(it) }
-                }.getOrDefault(emptyList())
-            } else {
-                emptyList()
-            },
-        )
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val quickFilterOptions: StateFlow<List<ListFilterOption>> =
+        settings.observeIsNsfwDisabled()
+            .distinctUntilChanged()
+            .flatMapLatest {
+                flow {
+                    emit(
+                        if (settings.isQuickFilterEnabled) {
+                            runCatchingCancellable {
+                                favouritesRepository.getMostUpdatedCategories(limit = 4).map { ListFilterOption.Favorite(it) }
+                            }.getOrDefault(emptyList())
+                        } else {
+                            emptyList()
+                        },
+                    )
+                }
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** The applied chips + an implicit SFW filter when NSFW content is disabled (Doki combineWithSettings). */
     private val effectiveFilter: StateFlow<Set<ListFilterOption>> =
-        _appliedFilter.map { applied ->
-            if (settings.isNsfwContentDisabled) applied + ListFilterOption.SFW else applied
+        combine(
+            _appliedFilter,
+            settings.observeIsNsfwDisabled().distinctUntilChanged(),
+        ) { applied, nsfwDisabled ->
+            if (nsfwDisabled) applied + ListFilterOption.SFW else applied
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     /** Whether the "Updated manga" header row is shown (Doki show_updated / KEY_FEED_HEADER), live. */

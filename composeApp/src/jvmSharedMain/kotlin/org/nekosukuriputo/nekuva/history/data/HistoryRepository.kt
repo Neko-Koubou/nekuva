@@ -3,6 +3,7 @@ package org.nekosukuriputo.nekuva.history.data
 import org.nekosukuriputo.nekuva.core.db.withTransactionKmp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import org.nekosukuriputo.nekuva.core.db.MangaDatabase
 import org.nekosukuriputo.nekuva.core.db.entity.toEntity
@@ -46,9 +47,40 @@ class HistoryRepository(
 	private val mangaRepository: MangaDataRepository,
 ) {
 
+	private fun observeIsNsfwDisabled(): Flow<Boolean> =
+		settings.observeIsNsfwDisabled().distinctUntilChanged()
+
+	private suspend fun filterHistoryList(list: List<HistoryWithManga>, skipNsfw: Boolean): List<Manga> {
+		val mangas = mangaRepository.applyOverrides(list.map { it.toManga() })
+		return if (skipNsfw) mangas.filterNot { it.isNsfw() } else mangas
+	}
+
 	suspend fun getList(offset: Int, limit: Int): List<Manga> {
-		val entities = db.getHistoryDao().findAll(offset, limit)
-		return entities.map { it.toManga() }
+		if (limit <= 0) return emptyList()
+		if (!settings.isNsfwContentDisabled) {
+			val entities = db.getHistoryDao().findAll(offset, limit)
+			return entities.map { it.toManga() }
+		}
+		val overrides = mangaRepository.getOverrides()
+		val needed = offset + limit
+		val batchSize = maxOf(limit * 2, 20)
+		val collected = ArrayList<Manga>(needed)
+		var dbOffset = 0
+		while (collected.size < needed) {
+			val batch = db.getHistoryDao().findAll(dbOffset, batchSize)
+			if (batch.isEmpty()) break
+			dbOffset += batch.size
+			for (item in batch) {
+				val raw = item.toManga()
+				val effective = if (overrides.isEmpty()) raw else raw.withOverride(overrides[raw.id])
+				if (!effective.isNsfw()) {
+					collected.add(effective)
+					if (collected.size >= needed) break
+				}
+			}
+			if (batch.size < batchSize) break
+		}
+		return collected.drop(offset).take(limit)
 	}
 
 	/** Read-only title search over read history (for global search). */
@@ -59,31 +91,60 @@ class HistoryRepository(
 	): List<Manga> {
 		val q = "%$query%"
 		val dao = db.getHistoryDao()
-		return when (kind) {
-			org.nekosukuriputo.nekuva.search.domain.SearchKind.AUTHOR -> dao.searchByAuthor(q, limit)
-			org.nekosukuriputo.nekuva.search.domain.SearchKind.TAG -> dao.searchByTag(q, limit)
-			else -> dao.searchByTitle(q, limit)
+		val skipNsfw = settings.isNsfwContentDisabled
+		val queryLimit = if (skipNsfw) maxOf(limit * 4, 50) else limit
+		val raw = when (kind) {
+			org.nekosukuriputo.nekuva.search.domain.SearchKind.AUTHOR -> dao.searchByAuthor(q, queryLimit)
+			org.nekosukuriputo.nekuva.search.domain.SearchKind.TAG -> dao.searchByTag(q, queryLimit)
+			else -> dao.searchByTitle(q, queryLimit)
 		}.toMangaList()
+		if (!skipNsfw) return raw
+		return mangaRepository.applyOverrides(raw)
+			.filterNot { it.isNsfw() }
+			.take(limit)
 	}
 
-	suspend fun getLastOrNull(): Manga? {
-		val entity = db.getHistoryDao().findAll(0, 1).firstOrNull() ?: return null
-		return entity.toManga()
-	}
+	suspend fun getLastOrNull(): Manga? = getList(0, 1).firstOrNull()
 
 	fun observeLast(): Flow<Manga?> {
-		return db.getHistoryDao().observeAll(1).map {
-			val first = it.firstOrNull()
-			first?.toManga()
+		return observeIsNsfwDisabled().flatMapLatest { skipNsfw ->
+			if (!skipNsfw) {
+				db.getHistoryDao().observeAll(1).map { it.firstOrNull()?.toManga() }
+			} else {
+				db.getHistoryDao().observeAll().map { list ->
+					if (list.isEmpty()) {
+						null
+					} else {
+						val overrides = mangaRepository.getOverrides()
+						list.firstNotNullOfOrNull { item ->
+							val raw = item.toManga()
+							val effective = if (overrides.isEmpty()) raw else raw.withOverride(overrides[raw.id])
+							effective.takeUnless { it.isNsfw() }
+						}
+					}
+				}
+			}
 		}
 	}
 
 	fun observeAll(): Flow<List<Manga>> {
-		return db.getHistoryDao().observeAll().map { list -> list.map { it.toManga() } }
+		return observeIsNsfwDisabled().flatMapLatest { skipNsfw ->
+			db.getHistoryDao().observeAll().map { list ->
+				filterHistoryList(list, skipNsfw)
+			}
+		}
 	}
 
 	fun observeAll(limit: Int): Flow<List<Manga>> {
-		return db.getHistoryDao().observeAll(limit).map { list -> list.map { it.toManga() } }
+		return observeIsNsfwDisabled().flatMapLatest { skipNsfw ->
+			if (!skipNsfw) {
+				db.getHistoryDao().observeAll(limit).map { list -> list.map { it.toManga() } }
+			} else {
+				db.getHistoryDao().observeAll().map { list ->
+					filterHistoryList(list, skipNsfw = true).take(limit)
+				}
+			}
+		}
 	}
 
 	fun observeAllWithHistory(
@@ -91,15 +152,29 @@ class HistoryRepository(
 		filterOptions: Set<ListFilterOption>,
 		limit: Int
 	): Flow<List<MangaWithHistory>> {
-		return db.getHistoryDao().observeAll(order, filterOptions, limit).map { list ->
-			// Apply user overrides (custom title/cover) for display (Doki MangaListMapper.getOverrides()).
-			val overrides = mangaRepository.getOverrides()
-			list.map {
-				val manga = it.toManga()
-				MangaWithHistory(
-					if (overrides.isEmpty()) manga else manga.withOverride(overrides[manga.id]),
-					it.history.toMangaHistory(),
-				)
+		return observeIsNsfwDisabled().flatMapLatest { skipNsfw ->
+			val effectiveFilters = if (skipNsfw) {
+				filterOptions.filterNot {
+					it == ListFilterOption.Macro.NSFW ||
+						(it is ListFilterOption.Source && it.mangaSource.isNsfw())
+				}.toSet() + ListFilterOption.SFW
+			} else {
+				filterOptions
+			}
+			val queryLimit = if (skipNsfw) 0 else limit
+			db.getHistoryDao().observeAll(order, effectiveFilters, queryLimit).map { list ->
+				// Apply user overrides (custom title/cover) for display (Doki MangaListMapper.getOverrides()).
+				val overrides = mangaRepository.getOverrides()
+				val mapped = list.mapNotNull { item ->
+					val raw = item.toManga()
+					val effective = if (overrides.isEmpty()) raw else raw.withOverride(overrides[raw.id])
+					if (skipNsfw && effective.isNsfw()) {
+						null
+					} else {
+						MangaWithHistory(effective, item.history.toMangaHistory())
+					}
+				}
+				if (skipNsfw && limit > 0) mapped.take(limit) else mapped
 			}
 		}
 	}
@@ -197,7 +272,9 @@ class HistoryRepository(
 	}
 
 	suspend fun getPopularSources(limit: Int): List<MangaSource> {
-		return db.getHistoryDao().findPopularSources(limit).toMangaSources()
+		val skipNsfw = settings.isNsfwContentDisabled
+		val raw = db.getHistoryDao().findPopularSources(if (skipNsfw) maxOf(limit * 4, 20) else limit).toMangaSources()
+		return if (skipNsfw) raw.filterNot { it.isNsfw() }.take(limit) else raw
 	}
 
 	fun shouldSkip(manga: Manga): Boolean = settings.isIncognitoModeEnabled(manga.isNsfw())

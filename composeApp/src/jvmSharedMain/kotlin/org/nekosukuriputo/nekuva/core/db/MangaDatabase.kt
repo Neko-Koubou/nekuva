@@ -36,7 +36,7 @@ import org.nekosukuriputo.nekuva.tracker.data.TrackEntity
 import org.nekosukuriputo.nekuva.tracker.data.TrackLogEntity
 import org.nekosukuriputo.nekuva.tracker.data.TracksDao
 
-const val DATABASE_VERSION = 1
+const val DATABASE_VERSION = 2
 
 @Database(
 	entities = [

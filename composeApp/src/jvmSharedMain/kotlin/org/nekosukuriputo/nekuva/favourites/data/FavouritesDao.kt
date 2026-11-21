@@ -36,22 +36,23 @@ abstract class FavouritesDao : MangaQueryBuilder.ConditionCallback {
 	abstract suspend fun findLast(limit: Int): List<FavouriteManga>
 
 	@Transaction
-	@Query("SELECT manga.* FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id WHERE favourites.deleted_at = 0 AND (manga.title LIKE :query OR manga.alt_title LIKE :query) LIMIT :limit")
-	abstract suspend fun searchByTitle(query: String, limit: Int): List<MangaWithTags>
+	@Query("SELECT manga.* FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id WHERE favourites.deleted_at = 0 AND (:excludeNsfwCategories = 0 OR (SELECT nsfw FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 0) AND (manga.title LIKE :query OR manga.alt_title LIKE :query) LIMIT :limit")
+	abstract suspend fun searchByTitle(query: String, limit: Int, excludeNsfwCategories: Boolean = false): List<MangaWithTags>
 
 	@Transaction
-	@Query("SELECT manga.* FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id WHERE favourites.deleted_at = 0 AND (manga.author LIKE :query) LIMIT :limit")
-	abstract suspend fun searchByAuthor(query: String, limit: Int): List<MangaWithTags>
+	@Query("SELECT manga.* FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id WHERE favourites.deleted_at = 0 AND (:excludeNsfwCategories = 0 OR (SELECT nsfw FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 0) AND (manga.author LIKE :query) LIMIT :limit")
+	abstract suspend fun searchByAuthor(query: String, limit: Int, excludeNsfwCategories: Boolean = false): List<MangaWithTags>
 
 	@Transaction
-	@Query("SELECT manga.* FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id WHERE favourites.deleted_at = 0 AND EXISTS(SELECT 1 FROM tags LEFT JOIN manga_tags ON manga_tags.tag_id = tags.tag_id WHERE manga_tags.manga_id = manga.manga_id AND tags.title LIKE :query) LIMIT :limit")
-	abstract suspend fun searchByTag(query: String, limit: Int): List<MangaWithTags>
+	@Query("SELECT manga.* FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id WHERE favourites.deleted_at = 0 AND (:excludeNsfwCategories = 0 OR (SELECT nsfw FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 0) AND EXISTS(SELECT 1 FROM tags LEFT JOIN manga_tags ON manga_tags.tag_id = tags.tag_id WHERE manga_tags.manga_id = manga.manga_id AND tags.title LIKE :query) LIMIT :limit")
+	abstract suspend fun searchByTag(query: String, limit: Int, excludeNsfwCategories: Boolean = false): List<MangaWithTags>
 
 	fun observeAll(
 		order: ListSortOrder,
 		filterOptions: Set<ListFilterOption>,
-		limit: Int
-	): Flow<List<FavouriteManga>> = observeAll(0L, order, filterOptions, limit)
+		limit: Int,
+		excludeNsfwCategories: Boolean = false,
+	): Flow<List<FavouriteManga>> = observeAll(0L, order, filterOptions, limit, excludeNsfwCategories)
 
 	@Transaction
 	@Query("SELECT * FROM favourites WHERE deleted_at = 0 ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
@@ -75,7 +76,8 @@ abstract class FavouritesDao : MangaQueryBuilder.ConditionCallback {
 		categoryId: Long,
 		order: ListSortOrder,
 		filterOptions: Set<ListFilterOption>,
-		limit: Int
+		limit: Int,
+		excludeNsfwCategories: Boolean = false,
 	): Flow<List<FavouriteManga>> = observeAllImpl(
 		MangaQueryBuilder(TABLE_FAVOURITES, this)
 			.join("LEFT JOIN manga ON favourites.manga_id = manga.manga_id")
@@ -83,6 +85,9 @@ abstract class FavouritesDao : MangaQueryBuilder.ConditionCallback {
 			.where(
 				if (categoryId != 0L) {
 					"category_id = $categoryId"
+				} else if (excludeNsfwCategories) {
+					"(SELECT show_in_lib FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 1 AND " +
+						"(SELECT nsfw FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 0"
 				} else {
 					"(SELECT show_in_lib FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 1"
 				},
@@ -106,15 +111,20 @@ abstract class FavouritesDao : MangaQueryBuilder.ConditionCallback {
 		return findCoversImpl(query)
 	}
 
-	suspend fun findCovers(order: ListSortOrder, limit: Int): List<Cover> {
+	suspend fun findCovers(order: ListSortOrder, limit: Int, excludeNsfwCategories: Boolean = false): List<Cover> {
 		val orderBy = getOrderBy(order)
+		val nsfwClause = if (excludeNsfwCategories) {
+			" AND (SELECT nsfw FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 0"
+		} else {
+			""
+		}
 
 		@Language("RoomSql")
 		val query = RoomRawQuery(
 			"SELECT manga.cover_url AS url, manga.source AS source FROM favourites " +
 				"LEFT JOIN manga ON favourites.manga_id = manga.manga_id " +
 				"WHERE deleted_at = 0 AND " +
-				"(SELECT show_in_lib FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 1 " +
+				"(SELECT show_in_lib FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 1$nsfwClause " +
 				"GROUP BY manga.manga_id ORDER BY $orderBy LIMIT ?"
 		) { stmt -> stmt.bindLong(1, limit.toLong()) }
 		return findCoversImpl(query)
@@ -204,7 +214,7 @@ abstract class FavouritesDao : MangaQueryBuilder.ConditionCallback {
 	abstract suspend fun upsert(entity: FavouriteEntity)
 
 	@Transaction
-	@RawQuery(observedEntities = [FavouriteEntity::class])
+	@RawQuery(observedEntities = [FavouriteEntity::class, FavouriteCategoryEntity::class])
 	protected abstract fun observeAllImpl(query: RoomRawQuery): Flow<List<FavouriteManga>>
 
 	@RawQuery

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.nekosukuriputo.nekuva.core.model.isNsfw
 import org.nekosukuriputo.nekuva.history.data.HistoryRepository
 import org.nekosukuriputo.nekuva.history.domain.model.MangaWithHistory
 import org.nekosukuriputo.nekuva.list.domain.ListFilterOption
@@ -62,23 +63,33 @@ class HistoryViewModel(
     val availableFilters: StateFlow<List<ListFilterOption>> = _availableFilters.asStateFlow()
 
     init {
-        loadAvailableFilters()
+        observeFiltersForNsfw()
     }
 
-    private fun loadAvailableFilters() {
+    private fun observeFiltersForNsfw() {
         viewModelScope.launch {
-            val tags = runCatching { historyRepository.getPopularTags(3) }.getOrDefault(emptyList())
-            val sources = runCatching { historyRepository.getPopularSources(3) }.getOrDefault(emptyList())
-            _availableFilters.value = buildList {
-                add(ListFilterOption.Downloaded)
-                if (settings.isTrackerEnabled) add(ListFilterOption.Macro.NEW_CHAPTERS)
-                add(ListFilterOption.Macro.COMPLETED)
-                add(ListFilterOption.Macro.FAVORITE)
-                add(ListFilterOption.NOT_FAVORITE)
-                if (!settings.isNsfwContentDisabled) add(ListFilterOption.Macro.NSFW)
-                tags.forEach { add(ListFilterOption.Tag(it)) }
-                sources.forEach { add(ListFilterOption.Source(it)) }
-            }
+            settings.observeIsNsfwDisabled()
+                .distinctUntilChanged()
+                .collect { skipNsfw ->
+                    if (skipNsfw) {
+                        _filters.value = _filters.value.filterNot { option ->
+                            option == ListFilterOption.Macro.NSFW ||
+                                (option is ListFilterOption.Source && option.mangaSource.isNsfw())
+                        }.toSet()
+                    }
+                    val tags = runCatching { historyRepository.getPopularTags(3) }.getOrDefault(emptyList())
+                    val sources = runCatching { historyRepository.getPopularSources(3) }.getOrDefault(emptyList())
+                    _availableFilters.value = buildList {
+                        add(ListFilterOption.Downloaded)
+                        if (settings.isTrackerEnabled) add(ListFilterOption.Macro.NEW_CHAPTERS)
+                        add(ListFilterOption.Macro.COMPLETED)
+                        add(ListFilterOption.Macro.FAVORITE)
+                        add(ListFilterOption.NOT_FAVORITE)
+                        if (!skipNsfw) add(ListFilterOption.Macro.NSFW)
+                        tags.forEach { add(ListFilterOption.Tag(it)) }
+                        sources.forEach { add(ListFilterOption.Source(it)) }
+                    }
+                }
         }
     }
 

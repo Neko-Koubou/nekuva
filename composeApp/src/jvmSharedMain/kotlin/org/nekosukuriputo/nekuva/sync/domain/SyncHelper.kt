@@ -104,7 +104,8 @@ class SyncHelper(
 	private suspend fun upsertCategories(categories: List<FavouriteCategorySyncDto>) {
 		val dao = db.getFavouriteCategoriesDao()
 		for (dto in categories) {
-			dao.upsert(dto.toEntity())
+			val existingNsfw = runCatching { dao.find(dto.categoryId).isNsfw }.getOrDefault(false)
+			dao.upsert(dto.toEntity(isNsfw = existingNsfw))
 		}
 	}
 

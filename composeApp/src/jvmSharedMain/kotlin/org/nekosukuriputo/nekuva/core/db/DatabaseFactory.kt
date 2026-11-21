@@ -10,6 +10,7 @@ fun getRoomDatabase(
 ): MangaDatabase {
     return builder
         .setDriver(BundledSQLiteDriver())
+        .addMigrations(MIGRATION_1_2)
         .addCallback(DatabasePrePopulateCallback())
         .build()
 }

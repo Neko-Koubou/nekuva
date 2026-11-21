@@ -13,6 +13,7 @@ fun FavouriteCategoryEntity.toFavouriteCategory(id: Long = categoryId.toLong()) 
 	createdAt = createdAt,
 	isTrackingEnabled = track,
 	isVisibleInLibrary = isVisibleInLibrary,
+	isNsfw = isNsfw,
 )
 
 fun FavouriteManga.toManga() = manga.toManga(tags.toMangaTags(), null)

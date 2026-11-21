@@ -42,6 +42,13 @@ class FavouritesViewModel(
         viewModelScope.launch { runCatching { repository.removeCategories(setOf(categoryId)) } }
     }
 
+    /** Rename/update a category inline (Doki popup_fav_tab action_edit → category edit). */
+    fun updateCategory(categoryId: Long, title: String, isNsfw: Boolean) {
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch { runCatching { repository.updateCategoryTitleAndNsfw(categoryId, trimmed, isNsfw) } }
+    }
+
     /** Rename a category inline (Doki popup_fav_tab action_edit → category edit). */
     fun renameCategory(categoryId: Long, title: String) {
         val trimmed = title.trim()

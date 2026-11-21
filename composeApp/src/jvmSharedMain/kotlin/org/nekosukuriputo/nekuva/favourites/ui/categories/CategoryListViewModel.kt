@@ -28,25 +28,28 @@ class CategoryListViewModel(
         settings.isAllFavouritesVisible = !settings.isAllFavouritesVisible
     }
 
-    fun createCategory(title: String) {
+    fun createCategory(title: String, isNsfw: Boolean = false) {
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) return
         viewModelScope.launch {
             repository.createCategory(
-                title = title,
+                title = trimmed,
                 sortOrder = ListSortOrder.NEWEST,
                 isTrackerEnabled = true, // track new chapters by default (Doki parity → Feed tab)
-                isVisibleOnShelf = true
+                isVisibleOnShelf = true,
+                isNsfw = isNsfw,
             )
         }
     }
 
-    fun updateCategory(category: FavouriteCategory, newTitle: String) {
+    fun updateCategory(category: FavouriteCategory, newTitle: String, isNsfw: Boolean = category.isNsfw) {
+        val trimmed = newTitle.trim()
+        if (trimmed.isEmpty()) return
         viewModelScope.launch {
-            repository.updateCategory(
+            repository.updateCategoryTitleAndNsfw(
                 id = category.id,
-                title = newTitle,
-                sortOrder = ListSortOrder(category.sortKey.toString(), ListSortOrder.NEWEST), // we might not have the correct current order, but updating just title for now
-                isTrackerEnabled = category.isTrackingEnabled,
-                isVisibleOnShelf = category.isVisibleInLibrary
+                title = trimmed,
+                isNsfw = isNsfw,
             )
         }
     }
@@ -54,12 +57,9 @@ class CategoryListViewModel(
     /** Toggle new-chapter tracking for a category (drives the Feed tab). */
     fun toggleTracking(category: FavouriteCategory) {
         viewModelScope.launch {
-            repository.updateCategory(
+            repository.setCategoryTracking(
                 id = category.id,
-                title = category.title,
-                sortOrder = ListSortOrder(category.sortKey.toString(), ListSortOrder.NEWEST),
-                isTrackerEnabled = !category.isTrackingEnabled,
-                isVisibleOnShelf = category.isVisibleInLibrary,
+                isEnabled = !category.isTrackingEnabled,
             )
         }
     }
